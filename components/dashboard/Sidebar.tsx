@@ -12,6 +12,8 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
+  Bell,
+  Trophy,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -23,6 +25,8 @@ const mainNav = [
   { name: "Tiendas", href: "/stores", icon: Store },
   { name: "Dispositivos", href: "/devices", icon: Camera },
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
+  { name: "Benchmark", href: "/analytics/benchmark", icon: Trophy },
+  { name: "Alertas", href: "/alerts", icon: Bell },
 ];
 
 const bottomNav = [

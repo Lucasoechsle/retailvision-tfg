@@ -94,6 +94,18 @@ export const ingestQueuesSchema = z.object({
   timestamp: z.string().datetime().optional(),
 });
 
+export const ingestShelfHeatmapSchema = z.object({
+  shelves: z.array(
+    z.object({
+      zone_id: z.string().uuid(),
+      grid_data: z.array(z.array(z.number())),
+      resolution: z.string().regex(/^\d+x\d+$/),
+    })
+  ),
+  timestamp: z.string().datetime().optional(),
+});
+
+export type IngestShelfHeatmapInput = z.infer<typeof ingestShelfHeatmapSchema>;
 export type IngestCountsInput = z.infer<typeof ingestCountsSchema>;
 export type IngestHeatmapInput = z.infer<typeof ingestHeatmapSchema>;
 export type IngestZoneDataInput = z.infer<typeof ingestZoneDataSchema>;

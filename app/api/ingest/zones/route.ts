@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ingestZoneDataSchema } from "@/lib/schemas/ingest";
+import { evaluateAlerts } from "@/lib/alerts/engine";
 
 export async function POST(request: NextRequest) {
   const apiKey = request.headers.get("X-Device-Key");
@@ -67,6 +68,12 @@ export async function POST(request: NextRequest) {
       await supabase.from("dwell_events").insert(dwellRecords);
     }
   }
+
+  evaluateAlerts(supabase, {
+    store_id: device.store_id,
+    type: "zones",
+    data: { zones: parsed.data.zones },
+  }).catch(() => {});
 
   return NextResponse.json({ success: true });
 }

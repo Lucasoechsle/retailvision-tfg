@@ -10,6 +10,7 @@ from heatmap import HeatmapAccumulator
 from zone_tracker import ZoneTracker
 from journey_tracker import JourneyTracker
 from queue_detector import QueueDetector
+from shelf_heatmap import ShelfHeatmap
 from uploader import DataUploader
 from health import HealthMonitor
 from frame_server import FrameServer
@@ -59,7 +60,8 @@ async def fetch_device_config():
 
 
 async def upload_data(uploader, counter, heatmap, zone_tracker, health,
-                      journey_tracker=None, queue_detector=None):
+                      journey_tracker=None, queue_detector=None,
+                      shelf_heatmap=None):
     """Upload all pending data."""
     if uploader.should_send_heartbeat():
         hb = health.get_heartbeat()
@@ -102,6 +104,13 @@ async def upload_data(uploader, counter, heatmap, zone_tracker, health,
             success = await uploader.upload_queue_snapshot(snapshots)
             if success:
                 queue_detector.reset()
+
+    if shelf_heatmap and shelf_heatmap.has_gondola_zones and uploader.should_upload_shelf_heatmap():
+        shelf_data = shelf_heatmap.get_shelf_data()
+        if shelf_data:
+            success = await uploader.upload_shelf_heatmap(shelf_data)
+            if success:
+                shelf_heatmap.reset()
 
     if uploader.online:
         await uploader.flush_buffer()
@@ -157,6 +166,7 @@ async def main():
     zone_tracker = None
     journey_tracker = None
     queue_detector = None
+    shelf_heatmap_tracker = None
     if zones_list:
         zone_tracker = ZoneTracker(
             zones_list, frame_w, frame_h,
@@ -169,8 +179,14 @@ async def main():
         queue_detector = QueueDetector(
             zones_list, avg_service_time=config.AVG_SERVICE_TIME,
         )
+        shelf_heatmap_tracker = ShelfHeatmap(
+            zones_list, frame_w, frame_h,
+            default_rows=config.SHELF_DEFAULT_ROWS,
+            default_cols=config.SHELF_DEFAULT_COLS,
+        )
         checkout_count = len(queue_detector.checkout_zones)
-        print(f"[OK] {len(zones_list)} zones loaded ({checkout_count} checkout)")
+        gondola_count = len(shelf_heatmap_tracker.gondola_zones)
+        print(f"[OK] {len(zones_list)} zones loaded ({checkout_count} checkout, {gondola_count} gondola)")
     else:
         print("[!] No zones configured - zone/journey/queue tracking disabled")
 
@@ -211,6 +227,8 @@ async def main():
                     journey_tracker.update(zone_tracker)
                 if queue_detector and queue_detector.has_checkout_zones:
                     queue_detector.update(zone_tracker)
+                if shelf_heatmap_tracker and shelf_heatmap_tracker.has_gondola_zones:
+                    shelf_heatmap_tracker.update(person_detections)
 
             frame_server.update_frame(frame)
 
@@ -225,7 +243,7 @@ async def main():
             if frame_count % 30 == 0:
                 asyncio.create_task(upload_data(
                     uploader, counter, heatmap, zone_tracker, health,
-                    journey_tracker, queue_detector,
+                    journey_tracker, queue_detector, shelf_heatmap_tracker,
                 ))
 
             # Hot-reload config
@@ -251,6 +269,11 @@ async def main():
                         )
                         queue_detector = QueueDetector(
                             new_zones, avg_service_time=config.AVG_SERVICE_TIME,
+                        )
+                        shelf_heatmap_tracker = ShelfHeatmap(
+                            new_zones, frame_w, frame_h,
+                            default_rows=config.SHELF_DEFAULT_ROWS,
+                            default_cols=config.SHELF_DEFAULT_COLS,
                         )
                         zones_list = new_zones
                         print(f"[OK] Zones reloaded: {len(zones_list)} zones")

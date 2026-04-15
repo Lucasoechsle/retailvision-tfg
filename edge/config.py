@@ -47,6 +47,10 @@ JOURNEY_LOST_TIMEOUT = float(os.getenv("JOURNEY_LOST_TIMEOUT", "10"))
 QUEUE_INTERVAL = int(os.getenv("QUEUE_INTERVAL", "60"))
 AVG_SERVICE_TIME = float(os.getenv("AVG_SERVICE_TIME", "120"))
 
+SHELF_HEATMAP_INTERVAL = int(os.getenv("SHELF_HEATMAP_INTERVAL", "300"))
+SHELF_DEFAULT_ROWS = int(os.getenv("SHELF_DEFAULT_ROWS", "4"))
+SHELF_DEFAULT_COLS = int(os.getenv("SHELF_DEFAULT_COLS", "6"))
+
 RETAIL_CLASSES = {
     0: "Persona",
     24: "Mochila",

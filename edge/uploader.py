@@ -23,6 +23,7 @@ class DataUploader:
         self.last_heartbeat = datetime.now()
         self.last_journey_upload = datetime.now()
         self.last_queue_upload = datetime.now()
+        self.last_shelf_heatmap_upload = datetime.now()
 
         self.online = True
 
@@ -142,3 +143,17 @@ class DataUploader:
 
     def should_upload_queues(self):
         return (datetime.now() - self.last_queue_upload).total_seconds() >= config.QUEUE_INTERVAL
+
+    async def upload_shelf_heatmap(self, shelf_data):
+        payload = {
+            "shelves": shelf_data,
+            "timestamp": datetime.now().isoformat(),
+        }
+        success = await self._post("/api/ingest/shelf-heatmap", payload)
+        if success:
+            self.last_shelf_heatmap_upload = datetime.now()
+            print(f"[OK] Shelf heatmap enviado ({len(shelf_data)} gondolas)")
+        return success
+
+    def should_upload_shelf_heatmap(self):
+        return (datetime.now() - self.last_shelf_heatmap_upload).total_seconds() >= config.SHELF_HEATMAP_INTERVAL

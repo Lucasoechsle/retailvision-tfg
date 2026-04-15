@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { ingestCountsSchema } from "@/lib/schemas/ingest";
+import { evaluateAlerts } from "@/lib/alerts/engine";
 
 export async function POST(request: NextRequest) {
   const apiKey = request.headers.get("X-Device-Key");
@@ -42,5 +43,12 @@ export async function POST(request: NextRequest) {
   });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  evaluateAlerts(supabase, {
+    store_id: device.store_id,
+    type: "counts",
+    data: parsed.data,
+  }).catch(() => {});
+
   return NextResponse.json({ success: true });
 }

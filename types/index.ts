@@ -55,7 +55,7 @@ export interface Zone {
   id: string;
   store_id: string;
   name: string;
-  zone_type: "aisle" | "checkout" | "entrance" | "promo" | "endcap" | "storage" | "other";
+  zone_type: "aisle" | "checkout" | "entrance" | "promo" | "endcap" | "storage" | "gondola" | "other";
   polygon: { x: number; y: number }[];
   color: string;
   floor_plan_id: string | null;
@@ -171,6 +171,26 @@ export interface AlertEvent {
   resolved_at: string | null;
   data: Record<string, unknown> | null;
   status: "active" | "acknowledged" | "resolved";
+}
+
+export interface ShelfGrid {
+  id: string;
+  zone_id: string;
+  rows: number;
+  cols: number;
+  cell_labels: Record<string, string>;
+  created_at: string;
+}
+
+export interface ShelfHeatmapRecord {
+  id: number;
+  zone_id: string;
+  store_id: string;
+  device_id: string | null;
+  timestamp: string;
+  grid_data: number[][];
+  resolution: string;
+  period_seconds: number;
 }
 
 // API request/response types

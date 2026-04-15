@@ -16,6 +16,9 @@ import {
   Settings,
   Route,
   ShoppingCart,
+  Megaphone,
+  LayoutGrid,
+  CalendarClock,
 } from "lucide-react";
 import {
   BarChart,
@@ -153,6 +156,9 @@ export function StoreDetail({
           { href: "conversion", icon: Users, title: "Conversión", desc: "Visitantes vs ventas" },
           { href: "journeys", icon: Route, title: "Recorridos", desc: "Trayectoria del cliente" },
           { href: "queues", icon: ShoppingCart, title: "Colas", desc: "Tiempos de espera" },
+          { href: "promos", icon: Megaphone, title: "Promociones", desc: "Efectividad de campañas" },
+          { href: "shelves", icon: LayoutGrid, title: "Góndolas", desc: "Heatmap por estante" },
+          { href: "temporal", icon: CalendarClock, title: "Temporal", desc: "Tendencias y patrones" },
         ].map((item) => (
           <Link key={item.href} href={`/stores/${store.id}/${item.href}`}>
             <Card className="cursor-pointer transition-colors hover:bg-accent/50">
