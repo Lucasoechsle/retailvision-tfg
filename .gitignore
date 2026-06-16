@@ -32,6 +32,11 @@ edge/.env
 # edge artifacts
 edge_buffer.db
 edge/__pycache__/
+edge/*.log
+edge/edge_run*.log
+edge/sample_*.mp4
+edge/sample_*.avi
+edge/venv/
 
 # windows artifacts
 nul

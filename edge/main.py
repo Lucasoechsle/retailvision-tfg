@@ -240,11 +240,15 @@ async def main():
                 fps_timer = time.time()
 
             # Upload data periodically
+            # NOTA: se usa await (no create_task) para garantizar la subida.
+            # Con create_task, si el procesamiento es más lento que el target FPS
+            # (CPU sin GPU), el event loop nunca cede y las tasks de subida se
+            # quedan sin ejecutar. Con await se garantiza la entrega de datos.
             if frame_count % 30 == 0:
-                asyncio.create_task(upload_data(
+                await upload_data(
                     uploader, counter, heatmap, zone_tracker, health,
                     journey_tracker, queue_detector, shelf_heatmap_tracker,
-                ))
+                )
 
             # Hot-reload config
             if time.time() - last_config_check > config.CONFIG_RELOAD_INTERVAL:
@@ -331,11 +335,12 @@ async def main():
                         f"WS:{ws_clients}"
                     )
 
-            # Frame rate control
+            # Frame rate control — siempre cede al event loop (sleep 0 mínimo)
+            # para que el frame server WebSocket y demás corrutinas avancen
+            # aunque el procesamiento sea más lento que el target FPS.
             elapsed = time.time() - loop_start
             wait = target_delay - elapsed
-            if wait > 0:
-                await asyncio.sleep(wait)
+            await asyncio.sleep(wait if wait > 0 else 0)
 
     except KeyboardInterrupt:
         print("\n[OK] Stopped by user")

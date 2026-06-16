@@ -1,6 +1,11 @@
 import time
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
+
+
+def _iso_utc_from_ts(ts):
+    """Convierte un timestamp epoch a ISO 8601 UTC con sufijo Z (formato que valida el backend)."""
+    return datetime.fromtimestamp(ts, timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 class ZoneTracker:
@@ -106,8 +111,8 @@ class ZoneTracker:
         self.completed_events.append({
             "zone_id": zone_id,
             "track_id": track_id,
-            "entered_at": datetime.fromtimestamp(enter_time).isoformat(),
-            "exited_at": datetime.fromtimestamp(enter_time + dwell_seconds).isoformat(),
+            "entered_at": _iso_utc_from_ts(enter_time),
+            "exited_at": _iso_utc_from_ts(enter_time + dwell_seconds),
             "dwell_seconds": round(dwell_seconds, 2),
             "engagement_type": engagement,
         })

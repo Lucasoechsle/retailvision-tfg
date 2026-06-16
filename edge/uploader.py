@@ -1,8 +1,13 @@
 import httpx
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 import config
 from local_buffer import LocalBuffer
+
+
+def _iso_utc():
+    """Timestamp ISO 8601 en UTC con sufijo Z (formato que valida el backend con Zod)."""
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 class DataUploader:
@@ -50,7 +55,7 @@ class DataUploader:
             "exits": counts["exits"],
             "current_inside": counts["current_inside"],
             "period_seconds": config.COUNT_INTERVAL,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": _iso_utc(),
         }
         success = await self._post("/api/ingest/counts", payload)
         if success:
@@ -63,7 +68,7 @@ class DataUploader:
             "period": "hourly",
             "heatmap_data": heatmap_data,
             "resolution": resolution,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": _iso_utc(),
         }
         success = await self._post("/api/ingest/heatmap", payload)
         if success:
@@ -75,7 +80,7 @@ class DataUploader:
         payload = {
             "zones": zone_data,
             "period_seconds": config.ZONE_INTERVAL,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": _iso_utc(),
         }
         success = await self._post("/api/ingest/zones", payload)
         if success:
@@ -93,7 +98,7 @@ class DataUploader:
         payload = {
             "journeys": journeys,
             "transitions": transitions,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": _iso_utc(),
         }
         success = await self._post("/api/ingest/journeys", payload)
         if success:
@@ -104,7 +109,7 @@ class DataUploader:
     async def upload_queue_snapshot(self, queue_data):
         payload = {
             "queues": queue_data,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": _iso_utc(),
         }
         success = await self._post("/api/ingest/queues", payload)
         if success:
@@ -147,7 +152,7 @@ class DataUploader:
     async def upload_shelf_heatmap(self, shelf_data):
         payload = {
             "shelves": shelf_data,
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": _iso_utc(),
         }
         success = await self._post("/api/ingest/shelf-heatmap", payload)
         if success:
