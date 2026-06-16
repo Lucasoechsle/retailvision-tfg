@@ -11,7 +11,8 @@ class QueueDetector:
 
     def __init__(self, zones, avg_service_time=120.0):
         self.checkout_zones = [
-            z for z in zones if z.get("type", "").lower() in ("checkout", "caja", "queue")
+            z for z in zones
+            if z.get("zone_type", z.get("type", "")).lower() in ("checkout", "caja", "queue")
         ]
         self.avg_service_time = avg_service_time
 

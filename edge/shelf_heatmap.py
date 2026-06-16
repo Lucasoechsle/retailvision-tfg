@@ -17,7 +17,7 @@ class ShelfHeatmap:
 
         self.gondola_zones = [
             z for z in zones
-            if z.get("type", "").lower() in ("gondola", "endcap")
+            if z.get("zone_type", z.get("type", "")).lower() in ("gondola", "endcap")
         ]
 
         self.grids = {}
