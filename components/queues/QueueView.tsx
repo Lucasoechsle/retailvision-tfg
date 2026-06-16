@@ -68,7 +68,7 @@ function formatWait(seconds: number): string {
 export function QueueView({ store, data }: QueueViewProps) {
   const { metrics, current_queues, history } = data;
 
-  const uniqueZones = [...new Set(history.map((h) => h.zone_name))];
+  const uniqueZones = Array.from(new Set(history.map((h) => h.zone_name)));
   const hourGroups: Record<string, Record<string, number>> = {};
   history.forEach((h) => {
     const hourLabel = new Date(h.hour).toLocaleTimeString("es", {
