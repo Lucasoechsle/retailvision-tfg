@@ -38,6 +38,15 @@ interface StoreDetailProps {
   zones: Zone[];
   hourlyTraffic: HourlyTraffic[];
   currentInside: number;
+  avgDwellSeconds?: number;
+}
+
+function formatDwell(seconds: number): string {
+  if (seconds <= 0) return "--";
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.round(seconds % 60);
+  return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
 }
 
 export function StoreDetail({
@@ -46,6 +55,7 @@ export function StoreDetail({
   zones,
   hourlyTraffic,
   currentInside,
+  avgDwellSeconds = 0,
 }: StoreDetailProps) {
   const devicesOnline = devices.filter((d) => d.status === "online").length;
 
@@ -101,9 +111,9 @@ export function StoreDetail({
         />
         <MetricCard
           title="Dwell Time Prom."
-          value="--"
+          value={formatDwell(avgDwellSeconds)}
           icon={Clock}
-          description="requiere zonas activas"
+          description={avgDwellSeconds > 0 ? "permanencia por zona" : "requiere zonas activas"}
         />
         <MetricCard
           title="Dispositivos"
