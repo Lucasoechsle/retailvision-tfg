@@ -5,13 +5,15 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Sidebar } from "./Sidebar";
 import { useState } from "react";
+import type { Role } from "@/lib/auth/roles";
 
 interface MobileSidebarProps {
+  role: Role;
   orgName?: string;
   plan?: string;
 }
 
-export function MobileSidebar({ orgName, plan }: MobileSidebarProps) {
+export function MobileSidebar({ role, orgName, plan }: MobileSidebarProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -22,7 +24,7 @@ export function MobileSidebar({ orgName, plan }: MobileSidebarProps) {
         </Button>
       </SheetTrigger>
       <SheetContent side="left" className="w-64 p-0">
-        <Sidebar orgName={orgName} plan={plan} />
+        <Sidebar role={role} orgName={orgName} plan={plan} />
       </SheetContent>
     </Sheet>
   );

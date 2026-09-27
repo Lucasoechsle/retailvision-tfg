@@ -1,5 +1,4 @@
-import { notFound } from "next/navigation";
-import { getStoreById } from "@/lib/data/stores";
+import { guardStoreModule } from "@/lib/auth/guards";
 import { getRecentCounts } from "@/lib/data/analytics";
 import { TrafficView } from "@/components/traffic/TrafficView";
 import type { Metadata } from "next";
@@ -11,8 +10,9 @@ export default async function TrafficPage({
 }: {
   params: { storeId: string };
 }) {
-  const store = await getStoreById(params.storeId);
-  if (!store) notFound();
+  const guard = await guardStoreModule(params.storeId, "traffic");
+  if (guard.denied) return guard.denied;
+  const { store } = guard;
 
   const counts = await getRecentCounts(params.storeId, 288);
 

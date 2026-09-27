@@ -1,5 +1,5 @@
+import { guardStoreModule } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
-import { notFound } from "next/navigation";
 import { StoreDevicesView } from "@/components/devices/StoreDevicesView";
 import type { Metadata } from "next";
 
@@ -10,14 +10,11 @@ export default async function StoreDevicesPage({
 }: {
   params: { storeId: string };
 }) {
-  const supabase = createClient();
-  const { data: store } = await supabase
-    .from("stores")
-    .select("*")
-    .eq("id", params.storeId)
-    .single();
+  const guard = await guardStoreModule(params.storeId, "devices");
+  if (guard.denied) return guard.denied;
+  const { store } = guard;
 
-  if (!store) notFound();
+  const supabase = createClient();
 
   const { data: devices } = await supabase
     .from("devices")

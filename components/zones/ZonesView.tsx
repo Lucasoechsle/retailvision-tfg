@@ -24,9 +24,11 @@ interface ZonesViewProps {
   store: Store;
   zones: Zone[];
   floorPlan?: FloorPlan | null;
+  /** HU-08: solo el administrador define zonas; el gerente de categoría ve el análisis (HU-15). */
+  canEdit: boolean;
 }
 
-export function ZonesView({ store, zones: initialZones, floorPlan }: ZonesViewProps) {
+export function ZonesView({ store, zones: initialZones, floorPlan, canEdit }: ZonesViewProps) {
   const [zones, setZones] = useState(initialZones);
   const [uploading, setUploading] = useState(false);
   const [currentFloorPlan, setCurrentFloorPlan] = useState<FloorPlan | null>(floorPlan || null);
@@ -75,7 +77,7 @@ export function ZonesView({ store, zones: initialZones, floorPlan }: ZonesViewPr
           <h1 className="text-3xl font-bold tracking-tight">Zonas</h1>
           <p className="mt-1 text-muted-foreground">{store.name}</p>
         </div>
-        {!currentFloorPlan && (
+        {canEdit && !currentFloorPlan && (
           <Button asChild disabled={uploading}>
             <label className="cursor-pointer">
               <Upload className="mr-2 h-4 w-4" />
@@ -91,20 +93,22 @@ export function ZonesView({ store, zones: initialZones, floorPlan }: ZonesViewPr
         )}
       </div>
 
-      <Tabs defaultValue="editor">
+      <Tabs defaultValue={canEdit ? "editor" : "analytics"}>
         <TabsList>
-          <TabsTrigger value="editor">Editor</TabsTrigger>
+          {canEdit && <TabsTrigger value="editor">Editor</TabsTrigger>}
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="editor" className="mt-4">
-          <ZoneEditor
-            storeId={store.id}
-            floorPlan={currentFloorPlan}
-            zones={zones}
-            onZoneSaved={refreshZones}
-          />
-        </TabsContent>
+        {canEdit && (
+          <TabsContent value="editor" className="mt-4">
+            <ZoneEditor
+              storeId={store.id}
+              floorPlan={currentFloorPlan}
+              zones={zones}
+              onZoneSaved={refreshZones}
+            />
+          </TabsContent>
+        )}
 
         <TabsContent value="analytics" className="mt-4">
           {zones.length === 0 ? (
@@ -113,7 +117,9 @@ export function ZonesView({ store, zones: initialZones, floorPlan }: ZonesViewPr
                 <Map className="mx-auto h-12 w-12 text-muted-foreground/50" />
                 <h3 className="mt-4 text-lg font-medium">Sin zonas definidas</h3>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Define zonas en el editor para ver sus métricas.
+                  {canEdit
+                    ? "Define zonas en el editor para ver sus métricas."
+                    : "El administrador todavía no definió zonas para esta tienda."}
                 </p>
               </CardContent>
             </Card>

@@ -1,41 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { z } from "zod";
-
-const inviteSchema = z.object({
-  email: z.string().email(),
-  role: z.enum(["admin", "manager", "analyst", "viewer"]),
-  full_name: z.string().min(1).optional(),
-});
+import { authorize } from "@/lib/auth/api";
+import { inviteUserSchema } from "@/lib/schemas/user";
+import { resolveStoreIds } from "@/lib/data/users";
 
 export async function POST(request: NextRequest) {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-
-  const { data: profile } = await supabase
-    .from("user_profiles")
-    .select("organization_id, role")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile || !["admin", "owner"].includes(profile.role)) {
-    return NextResponse.json({ error: "Sin permisos para invitar usuarios" }, { status: 403 });
-  }
+  const auth = await authorize("manage_users");
+  if (auth.error) return auth.error;
 
   const body = await request.json();
-  const parsed = inviteSchema.safeParse(body);
+  const parsed = inviteUserSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
   }
 
+  const storeIds = await resolveStoreIds(
+    parsed.data.role,
+    parsed.data.store_ids,
+    auth.session.organizationId
+  );
+  if (storeIds === "invalid") {
+    return NextResponse.json({ error: "Alguna tienda no pertenece a tu organización" }, { status: 400 });
+  }
+
   const adminClient = createAdminClient();
 
+  // El usuario define su contraseña desde "¿Olvidaste tu contraseña?" (HU-03)
   const { data: authData, error: authError } = await adminClient.auth.admin.createUser({
     email: parsed.data.email,
-    password: Math.random().toString(36).slice(-12) + "A1!",
-    email_confirm: false,
+    password: crypto.randomUUID() + "Aa1!",
+    email_confirm: true,
     user_metadata: { full_name: parsed.data.full_name || parsed.data.email },
   });
 
@@ -45,9 +39,10 @@ export async function POST(request: NextRequest) {
 
   const { error: profileError } = await adminClient.from("user_profiles").insert({
     id: authData.user.id,
-    organization_id: profile.organization_id,
+    organization_id: auth.session.organizationId,
     role: parsed.data.role,
     full_name: parsed.data.full_name || null,
+    store_ids: storeIds,
   });
 
   if (profileError) {
@@ -57,7 +52,14 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     success: true,
-    message: `Invitación enviada a ${parsed.data.email}`,
-    user: { id: authData.user.id, email: parsed.data.email, role: parsed.data.role },
+    message: `${parsed.data.email} agregado a la organización`,
+    user: {
+      id: authData.user.id,
+      email: parsed.data.email,
+      full_name: parsed.data.full_name || null,
+      role: parsed.data.role,
+      store_ids: storeIds,
+      created_at: authData.user.created_at,
+    },
   }, { status: 201 });
 }

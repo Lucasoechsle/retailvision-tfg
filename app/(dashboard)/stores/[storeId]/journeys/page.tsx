@@ -1,5 +1,4 @@
-import { notFound } from "next/navigation";
-import { getStoreById } from "@/lib/data/stores";
+import { guardStoreModule } from "@/lib/auth/guards";
 import { JourneyView } from "@/components/journeys/JourneyView";
 import { createClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
@@ -13,8 +12,9 @@ export default async function JourneysPage({
   params: { storeId: string };
   searchParams: { start?: string; end?: string };
 }) {
-  const store = await getStoreById(params.storeId);
-  if (!store) notFound();
+  const guard = await guardStoreModule(params.storeId, "journeys");
+  if (guard.denied) return guard.denied;
+  const { store } = guard;
 
   const supabase = createClient();
   const today = new Date().toISOString().split("T")[0];

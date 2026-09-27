@@ -1,5 +1,5 @@
-import { notFound } from "next/navigation";
 import { getStoreById } from "@/lib/data/stores";
+import { guardStoreModule } from "@/lib/auth/guards";
 import { getDevicesByStore } from "@/lib/data/devices";
 import { getZonesByStore } from "@/lib/data/zones";
 import { getHourlyTraffic, getRecentCounts } from "@/lib/data/analytics";
@@ -21,8 +21,9 @@ export default async function StoreDetailPage({
 }: {
   params: { storeId: string };
 }) {
-  const store = await getStoreById(params.storeId);
-  if (!store) notFound();
+  const guard = await guardStoreModule(params.storeId, "summary");
+  if (guard.denied) return guard.denied;
+  const { store, session } = guard;
 
   const supabase = createClient();
 
@@ -49,6 +50,7 @@ export default async function StoreDetailPage({
 
   return (
     <StoreDetail
+      role={session.role}
       store={store}
       devices={devices}
       zones={zones}

@@ -13,7 +13,14 @@ Transforma las cámaras de seguridad ya existentes en un local comercial en sens
 La plataforma se encuentra desplegada y accesible públicamente:
 
 - **Aplicación en producción:** https://retail-vision-mocha.vercel.app
-- **Credenciales de prueba:** `admin@retailvision.com` / `RetailVision2026!`
+- **Credenciales de prueba** (misma contraseña para todos: `RetailVision2026!`). Cada usuario tiene uno de los cuatro perfiles del sistema, y el menú, el panel de inicio y los módulos disponibles cambian según el perfil:
+
+| Perfil | Usuario | Qué ve |
+|---|---|---|
+| Administrador | `admin@retailvision.com` | Todo: gestión de tiendas, dispositivos, zonas, reglas de alertas y usuarios |
+| Gerente de tienda | `tienda@retailvision.com` | Ocupación, tráfico, colas, alertas y predicciones de su tienda (Sucursal Centro) |
+| Gerente de categoría | `categoria@retailvision.com` | Mapa de calor, zonas, recorridos, promociones y conversión |
+| Director comercial | `director@retailvision.com` | Vistas consolidadas, benchmark e insights |
 
 ---
 
@@ -54,6 +61,8 @@ El procesamiento de video ocurre íntegramente en el borde. Solo viajan números
 - **Tasa de conversión** a partir del cruce de visitantes con transacciones del POS
 - **Alertas configurables** por umbral e **insights prescriptivos** generados automáticamente
 - **Multi-tenant** con aislamiento de datos por organización vía Row Level Security
+- **Perfiles de usuario**: administrador, gerente de tienda (limitado a las tiendas a su cargo), gerente de categoría y director comercial, con permisos centralizados en `lib/auth/roles.ts` y aplicados en el menú, las páginas y la API
+- **Baja lógica de tiendas**: al dar de baja una tienda se conserva todo su histórico y puede reactivarse
 
 ## Estructura del proyecto
 
@@ -98,7 +107,12 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 SUPABASE_SERVICE_ROLE_KEY=...
 ```
 
-La base de datos se crea ejecutando `supabase_schema_completo.sql` en el SQL Editor de Supabase (22 tablas, 18 funciones y las políticas de RLS).
+La base de datos se crea ejecutando en el SQL Editor de Supabase, en este orden:
+
+1. `supabase_schema_completo.sql` — 22 tablas, 18 funciones y las políticas de RLS.
+2. `migration_roles_baja_logica.sql` — perfiles de usuario, tiendas a cargo y baja lógica de tiendas.
+
+Para crear los usuarios de demostración de cada perfil: `node scripts/seed-demo-roles.mjs`.
 
 ### 2. Pipeline de visión (edge)
 

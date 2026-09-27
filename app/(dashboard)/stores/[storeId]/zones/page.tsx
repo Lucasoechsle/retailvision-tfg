@@ -1,5 +1,5 @@
-import { notFound } from "next/navigation";
-import { getStoreById } from "@/lib/data/stores";
+import { guardStoreModule } from "@/lib/auth/guards";
+import { can } from "@/lib/auth/roles";
 import { getZonesByStore } from "@/lib/data/zones";
 import { createClient } from "@/lib/supabase/server";
 import { ZonesView } from "@/components/zones/ZonesView";
@@ -12,8 +12,9 @@ export default async function ZonesPage({
 }: {
   params: { storeId: string };
 }) {
-  const store = await getStoreById(params.storeId);
-  if (!store) notFound();
+  const guard = await guardStoreModule(params.storeId, "zones");
+  if (guard.denied) return guard.denied;
+  const { store, session } = guard;
 
   const zones = await getZonesByStore(params.storeId);
 
@@ -27,5 +28,12 @@ export default async function ZonesPage({
     .limit(1)
     .single();
 
-  return <ZonesView store={store} zones={zones} floorPlan={floorPlan} />;
+  return (
+    <ZonesView
+      store={store}
+      zones={zones}
+      floorPlan={floorPlan}
+      canEdit={can(session.role, "manage_zones")}
+    />
+  );
 }

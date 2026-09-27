@@ -1,5 +1,5 @@
+import { guardStoreModule } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
-import { notFound } from "next/navigation";
 import { ShelfGridView } from "@/components/shelves/ShelfGridView";
 import type { Metadata } from "next";
 
@@ -10,15 +10,11 @@ export default async function ShelvesPage({
 }: {
   params: { storeId: string };
 }) {
+  const guard = await guardStoreModule(params.storeId, "shelves");
+  if (guard.denied) return guard.denied;
+  const { store } = guard;
+
   const supabase = createClient();
-
-  const { data: store } = await supabase
-    .from("stores")
-    .select("*")
-    .eq("id", params.storeId)
-    .single();
-
-  if (!store) notFound();
 
   const { data: gondolaZones } = await supabase
     .from("zones")

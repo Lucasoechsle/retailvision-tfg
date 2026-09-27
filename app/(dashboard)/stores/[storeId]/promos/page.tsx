@@ -1,5 +1,4 @@
-import { notFound } from "next/navigation";
-import { getStoreById } from "@/lib/data/stores";
+import { guardStoreModule } from "@/lib/auth/guards";
 import { CampaignView } from "@/components/campaigns/CampaignView";
 import { createClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
@@ -11,8 +10,9 @@ export default async function PromosPage({
 }: {
   params: { storeId: string };
 }) {
-  const store = await getStoreById(params.storeId);
-  if (!store) notFound();
+  const guard = await guardStoreModule(params.storeId, "promos");
+  if (guard.denied) return guard.denied;
+  const { store } = guard;
 
   const supabase = createClient();
 

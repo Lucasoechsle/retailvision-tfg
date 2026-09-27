@@ -3,27 +3,29 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { SettingsUsers } from "@/components/settings/SettingsUsers";
+import { guardSection } from "@/lib/auth/guards";
+import { getAccessibleStores } from "@/lib/auth/session";
+import { can, isStoreScoped, ROLE_DESCRIPTIONS, ROLE_LABELS } from "@/lib/auth/roles";
+import { getOrganizationUsers } from "@/lib/data/users";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Configuración" };
 
 export default async function SettingsPage() {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const guard = await guardSection("settings");
+  if (guard.denied) return guard.denied;
+  const { session } = guard;
 
-  const { data: profile } = await supabase
-    .from("user_profiles")
-    .select("*, organizations(*)")
-    .eq("id", user!.id)
+  const supabase = createClient();
+  const { data: org } = await supabase
+    .from("organizations")
+    .select("*")
+    .eq("id", session.organizationId)
     .single();
 
-  const org = profile?.organizations as any;
-
-  const { data: orgUsers } = await supabase
-    .from("user_profiles")
-    .select("id, full_name, role, created_at")
-    .eq("organization_id", profile?.organization_id)
-    .order("created_at");
+  const canManageUsers = can(session.role, "manage_users");
+  const stores = await getAccessibleStores(session);
+  const orgUsers = canManageUsers ? await getOrganizationUsers(session.organizationId) : [];
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -40,18 +42,32 @@ export default async function SettingsPage() {
         <CardContent className="space-y-2 text-sm">
           <div className="flex justify-between">
             <span className="text-muted-foreground">Nombre</span>
-            <span className="font-medium">{profile?.full_name || "Sin nombre"}</span>
+            <span className="font-medium">{session.fullName || "Sin nombre"}</span>
           </div>
           <Separator />
           <div className="flex justify-between">
             <span className="text-muted-foreground">Email</span>
-            <span className="font-medium">{user?.email}</span>
+            <span className="font-medium">{session.email}</span>
           </div>
           <Separator />
-          <div className="flex justify-between">
-            <span className="text-muted-foreground">Rol</span>
-            <Badge variant="outline" className="capitalize">{profile?.role}</Badge>
+          <div className="flex justify-between gap-4">
+            <span className="text-muted-foreground">Perfil</span>
+            <div className="text-right">
+              <Badge variant="outline">{ROLE_LABELS[session.role]}</Badge>
+              <p className="mt-1 text-xs text-muted-foreground">{ROLE_DESCRIPTIONS[session.role]}</p>
+            </div>
           </div>
+          {isStoreScoped(session.role) && (
+            <>
+              <Separator />
+              <div className="flex justify-between gap-4">
+                <span className="text-muted-foreground">Tiendas a cargo</span>
+                <span className="text-right font-medium">
+                  {stores.map((s) => s.name).join(", ") || "Ninguna"}
+                </span>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
@@ -78,10 +94,9 @@ export default async function SettingsPage() {
         </CardContent>
       </Card>
 
-      <SettingsUsers
-        users={orgUsers || []}
-        currentUserRole={profile?.role || "viewer"}
-      />
+      {canManageUsers && (
+        <SettingsUsers users={orgUsers} stores={stores} currentUserId={session.userId} />
+      )}
     </div>
   );
 }

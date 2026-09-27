@@ -8,7 +8,10 @@ export const createStoreSchema = z.object({
   closing_time: z.string().default("21:00"),
 });
 
-export const updateStoreSchema = createStoreSchema.partial();
+export const updateStoreSchema = createStoreSchema.partial().extend({
+  // HU-04: false = baja lógica, true = reactivación (se conserva el histórico)
+  is_active: z.boolean().optional(),
+});
 
 export type CreateStoreInput = z.infer<typeof createStoreSchema>;
 export type UpdateStoreInput = z.infer<typeof updateStoreSchema>;

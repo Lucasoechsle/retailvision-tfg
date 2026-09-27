@@ -1,3 +1,5 @@
+import type { Role } from "@/lib/auth/roles";
+
 export interface Organization {
   id: string;
   name: string;
@@ -10,8 +12,10 @@ export interface Organization {
 export interface UserProfile {
   id: string;
   organization_id: string;
-  role: "owner" | "admin" | "manager" | "analyst" | "viewer";
+  role: Role;
   full_name: string | null;
+  /** Sucursales a cargo del gerente de tienda; null = todas. */
+  store_ids: string[] | null;
   created_at: string;
   organization?: Organization;
 }

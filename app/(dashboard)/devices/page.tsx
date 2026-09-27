@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { guardSection } from "@/lib/auth/guards";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { MetricCard } from "@/components/dashboard/MetricCard";
@@ -16,19 +17,15 @@ import type { Metadata } from "next";
 export const metadata: Metadata = { title: "Dispositivos" };
 
 export default async function DevicesPage() {
+  const guard = await guardSection("devices");
+  if (guard.denied) return guard.denied;
+
   const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-
-  const { data: profile } = await supabase
-    .from("user_profiles")
-    .select("organization_id")
-    .eq("id", user!.id)
-    .single();
-
   const { data: devices } = await supabase
     .from("devices")
-    .select("*, stores!inner(name, organization_id)")
-    .eq("stores.organization_id", profile?.organization_id)
+    .select("*, stores!inner(name, organization_id, is_active)")
+    .eq("stores.organization_id", guard.session.organizationId)
+    .eq("stores.is_active", true)
     .order("name");
 
   const deviceList = devices || [];

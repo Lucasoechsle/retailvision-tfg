@@ -18,6 +18,7 @@ import { useMemo } from "react";
 interface HeaderProps {
   userName: string;
   userEmail?: string;
+  roleLabel: string;
 }
 
 const routeLabels: Record<string, string> = {
@@ -31,9 +32,16 @@ const routeLabels: Record<string, string> = {
   traffic: "Tráfico",
   conversion: "Conversión",
   new: "Nueva",
+  queues: "Colas",
+  journeys: "Recorridos",
+  promos: "Promociones",
+  shelves: "Góndolas",
+  temporal: "Temporal",
+  alerts: "Alertas",
+  benchmark: "Benchmark",
 };
 
-export function Header({ userName, userEmail }: HeaderProps) {
+export function Header({ userName, userEmail, roleLabel }: HeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const supabase = createClient();
@@ -109,6 +117,7 @@ export function Header({ userName, userEmail }: HeaderProps) {
               {userEmail && (
                 <p className="text-xs text-muted-foreground">{userEmail}</p>
               )}
+              <p className="mt-1 text-xs font-medium text-primary">{roleLabel}</p>
             </div>
             <DropdownMenuSeparator />
             <DropdownMenuItem asChild>

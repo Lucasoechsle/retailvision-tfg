@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createDeviceSchema } from "@/lib/schemas/device";
 import { randomBytes } from "crypto";
+import { authorizeStore } from "@/lib/auth/api";
 
 export async function GET() {
   const supabase = createClient();
@@ -25,15 +26,17 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-
   const body = await request.json();
   const parsed = createDeviceSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
   }
+
+  // HU-05: solo el administrador registra dispositivos
+  const auth = await authorizeStore(parsed.data.store_id, "manage_devices");
+  if (auth.error) return auth.error;
+
+  const supabase = createClient();
 
   const apiKey = `rv_${randomBytes(24).toString("hex")}`;
 

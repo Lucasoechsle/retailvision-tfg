@@ -1,28 +1,15 @@
-import { createClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
+import { guardSection } from "@/lib/auth/guards";
+import { getAccessibleStores } from "@/lib/auth/session";
 import { AnalyticsOverview } from "@/components/analytics/AnalyticsOverview";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Analytics" };
 
 export default async function AnalyticsPage() {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const guard = await guardSection("analytics");
+  if (guard.denied) return guard.denied;
 
-  const { data: profile } = await supabase
-    .from("user_profiles")
-    .select("organization_id")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile) redirect("/login");
-
-  const { data: stores } = await supabase
-    .from("stores")
-    .select("id, name, address")
-    .eq("organization_id", profile.organization_id)
-    .order("name");
+  const stores = await getAccessibleStores(guard.session);
 
   return (
     <div className="space-y-6">
@@ -32,7 +19,7 @@ export default async function AnalyticsPage() {
           Insights automáticos, predicciones y recomendaciones
         </p>
       </div>
-      <AnalyticsOverview stores={stores || []} />
+      <AnalyticsOverview stores={stores} />
     </div>
   );
 }

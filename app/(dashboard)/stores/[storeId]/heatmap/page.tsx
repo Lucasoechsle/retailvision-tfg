@@ -1,5 +1,5 @@
+import { guardStoreModule } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
-import { notFound } from "next/navigation";
 import { HeatmapView } from "@/components/heatmap/HeatmapView";
 import type { Metadata } from "next";
 
@@ -10,14 +10,11 @@ export default async function HeatmapPage({
 }: {
   params: { storeId: string };
 }) {
-  const supabase = createClient();
-  const { data: store } = await supabase
-    .from("stores")
-    .select("*")
-    .eq("id", params.storeId)
-    .single();
+  const guard = await guardStoreModule(params.storeId, "heatmap");
+  if (guard.denied) return guard.denied;
+  const { store } = guard;
 
-  if (!store) notFound();
+  const supabase = createClient();
 
   const [heatmapsRes, floorPlanRes, zonesRes] = await Promise.all([
     supabase

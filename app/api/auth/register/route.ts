@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
       .insert({
         id: authData.user.id,
         organization_id: org.id,
-        role: "admin",
+        role: "owner", // HU-01: quien registra la organización es su Administrador
         full_name: fullName,
       });
 

@@ -1,18 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { authorize } from "@/lib/auth/api";
+import { canAccessSection } from "@/lib/auth/roles";
 
 export async function GET(request: NextRequest) {
+  const auth = await authorize();
+  if (auth.error) return auth.error;
+  if (!canAccessSection(auth.session.role, "benchmark")) {
+    return NextResponse.json({ error: "Tu perfil no tiene acceso al benchmark" }, { status: 403 });
+  }
+
   const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-
-  const { data: profile } = await supabase
-    .from("user_profiles")
-    .select("organization_id")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile) return NextResponse.json({ error: "Sin perfil" }, { status: 401 });
+  const profile = { organization_id: auth.session.organizationId };
 
   const days = parseInt(request.nextUrl.searchParams.get("days") || "30", 10);
   const since = new Date();

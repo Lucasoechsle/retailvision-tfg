@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { authorizeStore } from "@/lib/auth/api";
 
 export async function POST(request: NextRequest) {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-
   const formData = await request.formData();
   const file = formData.get("file") as File;
   const storeId = formData.get("storeId") as string;
@@ -14,6 +11,11 @@ export async function POST(request: NextRequest) {
   if (!file || !storeId) {
     return NextResponse.json({ error: "Archivo y storeId requeridos" }, { status: 400 });
   }
+
+  const auth = await authorizeStore(storeId, "manage_zones");
+  if (auth.error) return auth.error;
+
+  const supabase = createClient();
 
   const fileExt = file.name.split(".").pop();
   const fileName = `${storeId}/${Date.now()}.${fileExt}`;

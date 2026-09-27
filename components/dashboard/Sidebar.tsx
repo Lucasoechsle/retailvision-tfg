@@ -14,40 +14,56 @@ import {
   Eye,
   Bell,
   Trophy,
+  type LucideIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useState } from "react";
+import { canAccessSection, ROLE_LABELS, type Role, type Section } from "@/lib/auth/roles";
 
-const mainNav = [
-  { name: "Overview", href: "/dashboard", icon: LayoutDashboard },
-  { name: "Tiendas", href: "/stores", icon: Store },
-  { name: "Dispositivos", href: "/devices", icon: Camera },
-  { name: "Analytics", href: "/analytics", icon: BarChart3 },
-  { name: "Benchmark", href: "/analytics/benchmark", icon: Trophy },
-  { name: "Alertas", href: "/alerts", icon: Bell },
+interface NavItem {
+  name: string;
+  href: string;
+  icon: LucideIcon;
+  section: Section;
+}
+
+const mainNav: NavItem[] = [
+  { name: "Overview", href: "/dashboard", icon: LayoutDashboard, section: "overview" },
+  { name: "Tiendas", href: "/stores", icon: Store, section: "stores" },
+  { name: "Dispositivos", href: "/devices", icon: Camera, section: "devices" },
+  { name: "Analytics", href: "/analytics", icon: BarChart3, section: "analytics" },
+  { name: "Benchmark", href: "/analytics/benchmark", icon: Trophy, section: "benchmark" },
+  { name: "Alertas", href: "/alerts", icon: Bell, section: "alerts" },
 ];
 
-const bottomNav = [
-  { name: "Configuración", href: "/settings", icon: Settings },
+const bottomNav: NavItem[] = [
+  { name: "Configuración", href: "/settings", icon: Settings, section: "settings" },
 ];
 
 interface SidebarProps {
+  role: Role;
   orgName?: string;
   plan?: string;
 }
 
-export function Sidebar({ orgName = "Mi Organización", plan = "trial" }: SidebarProps) {
+export function Sidebar({ role, orgName = "Mi Organización", plan = "trial" }: SidebarProps) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
+  const visibleMain = mainNav.filter((item) => canAccessSection(role, item.section));
+  const visibleBottom = bottomNav.filter((item) => canAccessSection(role, item.section));
 
   const isActive = (href: string) => {
     if (href === "/dashboard") return pathname === "/dashboard";
-    return pathname.startsWith(href);
+    // "/analytics" no debe quedar activo dentro de "/analytics/benchmark"
+    const moreSpecific = mainNav.some(
+      (item) => item.href !== href && item.href.startsWith(href) && pathname.startsWith(item.href)
+    );
+    return pathname.startsWith(href) && !moreSpecific;
   };
 
-  const NavLink = ({ item }: { item: (typeof mainNav)[number] }) => {
+  const NavLink = ({ item }: { item: NavItem }) => {
     const active = isActive(item.href);
     const link = (
       <Link
@@ -110,7 +126,7 @@ export function Sidebar({ orgName = "Mi Organización", plan = "trial" }: Sideba
 
         {/* Main Navigation */}
         <nav className="flex-1 space-y-1 px-3 py-4">
-          {mainNav.map((item) => (
+          {visibleMain.map((item) => (
             <NavLink key={item.href} item={item} />
           ))}
         </nav>
@@ -119,7 +135,7 @@ export function Sidebar({ orgName = "Mi Organización", plan = "trial" }: Sideba
 
         {/* Bottom Navigation */}
         <div className="space-y-1 px-3 py-4">
-          {bottomNav.map((item) => (
+          {visibleBottom.map((item) => (
             <NavLink key={item.href} item={item} />
           ))}
         </div>
@@ -128,8 +144,8 @@ export function Sidebar({ orgName = "Mi Organización", plan = "trial" }: Sideba
         {!collapsed && (
           <div className="border-t border-border px-4 py-3">
             <p className="truncate text-sm font-medium">{orgName}</p>
-            <p className="text-xs text-muted-foreground capitalize">
-              Plan {plan}
+            <p className="text-xs text-muted-foreground">
+              {ROLE_LABELS[role]} · <span className="capitalize">Plan {plan}</span>
             </p>
           </div>
         )}

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { authorize } from "@/lib/auth/api";
 
 export async function GET(
   _request: NextRequest,
@@ -62,10 +63,10 @@ export async function DELETE(
   _request: NextRequest,
   { params }: { params: { campaignId: string } }
 ) {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  const auth = await authorize("manage_campaigns");
+  if (auth.error) return auth.error;
 
+  const supabase = createClient();
   const { error } = await supabase
     .from("campaigns")
     .delete()

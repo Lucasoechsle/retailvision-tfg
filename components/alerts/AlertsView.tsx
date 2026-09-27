@@ -74,7 +74,13 @@ const statusConfig: Record<string, { color: string; label: string }> = {
   resolved: { color: "secondary", label: "Resuelta" },
 };
 
-export function AlertsView({ stores }: { stores: Store[] }) {
+interface AlertsViewProps {
+  stores: Store[];
+  /** HU-21: solo el administrador configura reglas de alerta. */
+  canManageRules: boolean;
+}
+
+export function AlertsView({ stores, canManageRules }: AlertsViewProps) {
   const [rules, setRules] = useState<AlertRule[]>([]);
   const [events, setEvents] = useState<AlertEvent[]>([]);
   const [selectedStore, setSelectedStore] = useState(stores[0]?.id || "");
@@ -171,49 +177,51 @@ export function AlertsView({ stores }: { stores: Store[] }) {
           <RefreshCw className="mr-2 h-4 w-4" /> Actualizar
         </Button>
         <div className="flex-1" />
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button><Plus className="mr-2 h-4 w-4" /> Nueva Regla</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Crear Regla de Alerta</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label>Nombre</Label>
-                <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ej: Cola larga en cajas" />
-              </div>
-              <div>
-                <Label>Tipo</Label>
-                <Select value={form.rule_type} onValueChange={(v) => setForm({ ...form, rule_type: v, config: {} })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(ruleTypeConfig).map(([k, v]) => (
-                      <SelectItem key={k} value={k}>{v.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              {(configFields[form.rule_type] || []).map((field) => (
-                <div key={field.key}>
-                  <Label>{field.label}</Label>
-                  <Input
-                    type="number"
-                    value={form.config[field.key] ?? field.default}
-                    onChange={(e) => setForm({
-                      ...form,
-                      config: { ...form.config, [field.key]: parseInt(e.target.value, 10) },
-                    })}
-                  />
+        {canManageRules && (
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button><Plus className="mr-2 h-4 w-4" /> Nueva Regla</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Crear Regla de Alerta</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div>
+                  <Label>Nombre</Label>
+                  <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ej: Cola larga en cajas" />
                 </div>
-              ))}
-              <Button onClick={handleCreate} disabled={creating || !form.name} className="w-full">
-                {creating ? "Creando..." : "Crear Regla"}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+                <div>
+                  <Label>Tipo</Label>
+                  <Select value={form.rule_type} onValueChange={(v) => setForm({ ...form, rule_type: v, config: {} })}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(ruleTypeConfig).map(([k, v]) => (
+                        <SelectItem key={k} value={k}>{v.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {(configFields[form.rule_type] || []).map((field) => (
+                  <div key={field.key}>
+                    <Label>{field.label}</Label>
+                    <Input
+                      type="number"
+                      value={form.config[field.key] ?? field.default}
+                      onChange={(e) => setForm({
+                        ...form,
+                        config: { ...form.config, [field.key]: parseInt(e.target.value, 10) },
+                      })}
+                    />
+                  </div>
+                ))}
+                <Button onClick={handleCreate} disabled={creating || !form.name} className="w-full">
+                  {creating ? "Creando..." : "Crear Regla"}
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

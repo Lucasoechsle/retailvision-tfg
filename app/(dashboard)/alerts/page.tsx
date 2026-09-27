@@ -1,28 +1,16 @@
-import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
+import { guardSection } from "@/lib/auth/guards";
+import { getAccessibleStores } from "@/lib/auth/session";
+import { can } from "@/lib/auth/roles";
 import { AlertsView } from "@/components/alerts/AlertsView";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Alertas" };
 
 export default async function AlertsPage() {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
+  const guard = await guardSection("alerts");
+  if (guard.denied) return guard.denied;
 
-  const { data: profile } = await supabase
-    .from("user_profiles")
-    .select("organization_id")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile) redirect("/login");
-
-  const { data: stores } = await supabase
-    .from("stores")
-    .select("id, name")
-    .eq("organization_id", profile.organization_id)
-    .order("name");
+  const stores = await getAccessibleStores(guard.session);
 
   return (
     <div className="space-y-6">
@@ -32,7 +20,10 @@ export default async function AlertsPage() {
           Reglas de alerta y notificaciones en tiempo real
         </p>
       </div>
-      <AlertsView stores={stores || []} />
+      <AlertsView
+        stores={stores}
+        canManageRules={can(guard.session.role, "manage_alert_rules")}
+      />
     </div>
   );
 }

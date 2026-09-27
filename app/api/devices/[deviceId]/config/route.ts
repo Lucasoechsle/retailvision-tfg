@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { z } from "zod";
+import { authorize } from "@/lib/auth/api";
 
 const lineConfigSchema = z.object({
   counting_line: z.object({
@@ -64,10 +65,11 @@ export async function PUT(
   request: NextRequest,
   { params }: { params: { deviceId: string } }
 ) {
-  const supabase = createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return NextResponse.json({ error: "No autenticado" }, { status: 401 });
+  // HU-06/HU-07: la calibración y la línea de conteo las define el administrador
+  const auth = await authorize("manage_devices");
+  if (auth.error) return auth.error;
 
+  const supabase = createClient();
   const { data: device } = await supabase
     .from("devices")
     .select("id, config")

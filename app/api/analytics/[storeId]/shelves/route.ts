@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentUser, getUserOrgId } from "@/lib/data/auth";
+import { authorizeStore } from "@/lib/auth/api";
 
 export async function GET(
   request: NextRequest,
   { params }: { params: { storeId: string } }
 ) {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-  }
+  // Valida la organización y, para el gerente de tienda, que la tienda esté a su cargo
+  const auth = await authorizeStore(params.storeId);
+  if (auth.error) return auth.error;
 
   const { storeId } = params;
   const supabase = createClient();

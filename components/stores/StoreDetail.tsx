@@ -5,20 +5,13 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import {
-  Users,
   Clock,
   Camera,
   MapPin,
   Activity,
-  BarChart3,
   Map,
   ArrowUpRight,
   Settings,
-  Route,
-  ShoppingCart,
-  Megaphone,
-  LayoutGrid,
-  CalendarClock,
 } from "lucide-react";
 import {
   BarChart,
@@ -30,9 +23,12 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import Link from "next/link";
+import { canAccessStoreModule, type Role } from "@/lib/auth/roles";
+import { STORE_MODULE_LINKS } from "@/components/stores/storeModules";
 import type { Store, Device, Zone, HourlyTraffic } from "@/types";
 
 interface StoreDetailProps {
+  role: Role;
   store: Store;
   devices: Device[];
   zones: Zone[];
@@ -50,6 +46,7 @@ function formatDwell(seconds: number): string {
 }
 
 export function StoreDetail({
+  role,
   store,
   devices,
   zones,
@@ -58,6 +55,9 @@ export function StoreDetail({
   avgDwellSeconds = 0,
 }: StoreDetailProps) {
   const devicesOnline = devices.filter((d) => d.status === "online").length;
+  const canConfigure = canAccessStoreModule(role, "settings");
+  const canSeeDevices = canAccessStoreModule(role, "devices");
+  const modules = STORE_MODULE_LINKS.filter((m) => canAccessStoreModule(role, m.module));
 
   const chartData = hourlyTraffic.map((h) => ({
     hour: `${h.hour.toString().padStart(2, "0")}:00`,
@@ -87,14 +87,23 @@ export function StoreDetail({
           <Badge variant={store.is_active ? "default" : "secondary"}>
             {store.is_active ? "Activa" : "Inactiva"}
           </Badge>
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/stores/${store.id}/settings`}>
-              <Settings className="mr-2 h-4 w-4" />
-              Configurar
-            </Link>
-          </Button>
+          {canConfigure && (
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/stores/${store.id}/settings`}>
+                <Settings className="mr-2 h-4 w-4" />
+                Configurar
+              </Link>
+            </Button>
+          )}
         </div>
       </div>
+
+      {!store.is_active && (
+        <div className="rounded-lg border border-dashed border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+          Esta tienda está dada de baja: no aparece en el resto del sistema, pero se conserva su
+          histórico. Podés reactivarla desde <Link href={`/stores/${store.id}/settings`} className="font-medium text-foreground underline">Configurar</Link>.
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
@@ -157,26 +166,18 @@ export function StoreDetail({
         </Card>
       )}
 
-      {/* Quick Actions */}
+      {/* Módulos habilitados para el perfil */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {[
-          { href: "traffic", icon: BarChart3, title: "Tráfico", desc: "Entradas y salidas" },
-          { href: "zones", icon: Map, title: "Zonas", desc: `${zones.length} zonas definidas` },
-          { href: "heatmap", icon: Activity, title: "Mapa de Calor", desc: "Patrones de tráfico" },
-          { href: "conversion", icon: Users, title: "Conversión", desc: "Visitantes vs ventas" },
-          { href: "journeys", icon: Route, title: "Recorridos", desc: "Trayectoria del cliente" },
-          { href: "queues", icon: ShoppingCart, title: "Colas", desc: "Tiempos de espera" },
-          { href: "promos", icon: Megaphone, title: "Promociones", desc: "Efectividad de campañas" },
-          { href: "shelves", icon: LayoutGrid, title: "Góndolas", desc: "Heatmap por estante" },
-          { href: "temporal", icon: CalendarClock, title: "Temporal", desc: "Tendencias y patrones" },
-        ].map((item) => (
+        {modules.map((item) => (
           <Link key={item.href} href={`/stores/${store.id}/${item.href}`}>
             <Card className="cursor-pointer transition-colors hover:bg-accent/50">
               <CardContent className="flex items-center gap-3 p-4">
                 <item.icon className="h-5 w-5 text-primary" />
                 <div>
                   <p className="font-medium">{item.title}</p>
-                  <p className="text-xs text-muted-foreground">{item.desc}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {item.module === "zones" ? `${zones.length} zonas definidas` : item.desc}
+                  </p>
                 </div>
                 <ArrowUpRight className="ml-auto h-4 w-4 text-muted-foreground" />
               </CardContent>
@@ -186,40 +187,42 @@ export function StoreDetail({
       </div>
 
       {/* Devices */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Dispositivos</CardTitle>
-          <Button variant="outline" size="sm" asChild>
-            <Link href={`/stores/${store.id}/devices`}>Ver todos</Link>
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {devices.length === 0 ? (
-            <div className="py-8 text-center text-muted-foreground">
-              <Camera className="mx-auto h-8 w-8 mb-2 opacity-50" />
-              <p>Sin dispositivos configurados</p>
-              <p className="text-sm">Agrega cámaras para comenzar el tracking</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {devices.map((device) => (
-                <div
-                  key={device.id}
-                  className="flex items-center justify-between rounded-lg border border-border p-3"
-                >
-                  <div className="flex items-center gap-3">
-                    <Camera className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium">{device.name}</span>
+      {canSeeDevices && (
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Dispositivos</CardTitle>
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/stores/${store.id}/devices`}>Ver todos</Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {devices.length === 0 ? (
+              <div className="py-8 text-center text-muted-foreground">
+                <Camera className="mx-auto h-8 w-8 mb-2 opacity-50" />
+                <p>Sin dispositivos configurados</p>
+                <p className="text-sm">Agrega cámaras para comenzar el tracking</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {devices.map((device) => (
+                  <div
+                    key={device.id}
+                    className="flex items-center justify-between rounded-lg border border-border p-3"
+                  >
+                    <div className="flex items-center gap-3">
+                      <Camera className="h-4 w-4 text-muted-foreground" />
+                      <span className="font-medium">{device.name}</span>
+                    </div>
+                    <Badge variant={device.status === "online" ? "default" : "destructive"}>
+                      {device.status}
+                    </Badge>
                   </div>
-                  <Badge variant={device.status === "online" ? "default" : "destructive"}>
-                    {device.status}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

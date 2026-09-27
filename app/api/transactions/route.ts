@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
+import { authorizeStore } from "@/lib/auth/api";
 
 const transactionSchema = z.object({
   store_id: z.string().uuid(),
@@ -65,40 +65,14 @@ export async function POST(request: NextRequest) {
   }
 
   // ── Vía 2: carga manual desde el dashboard (sesión de usuario autenticado) ──
-  const supabaseUser = createClient();
-  const {
-    data: { user },
-  } = await supabaseUser.auth.getUser();
-  if (!user) {
-    return NextResponse.json({ error: "No autenticado" }, { status: 401 });
-  }
-
   const parsed = transactionSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0].message }, { status: 400 });
   }
 
-  const { data: profile } = await supabaseUser
-    .from("user_profiles")
-    .select("organization_id, role")
-    .eq("id", user.id)
-    .single();
-
-  if (!profile || !["admin", "manager", "owner"].includes(profile.role)) {
-    return NextResponse.json({ error: "Sin permisos para cargar transacciones" }, { status: 403 });
-  }
-
-  // Validar que la tienda pertenece a la organización del usuario
-  const { data: store } = await supabaseUser
-    .from("stores")
-    .select("id")
-    .eq("id", parsed.data.store_id)
-    .eq("organization_id", profile.organization_id)
-    .single();
-
-  if (!store) {
-    return NextResponse.json({ error: "Tienda no encontrada en tu organización" }, { status: 404 });
-  }
+  // HU-19: carga de transacciones POS (administrador y gerente de categoría)
+  const auth = await authorizeStore(parsed.data.store_id, "load_transactions");
+  if (auth.error) return auth.error;
 
   const admin = createAdminClient();
   const { error } = await admin.from("transactions").insert({

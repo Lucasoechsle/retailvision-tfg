@@ -1,5 +1,4 @@
-import { notFound } from "next/navigation";
-import { getStoreById } from "@/lib/data/stores";
+import { guardStoreModule } from "@/lib/auth/guards";
 import { QueueView } from "@/components/queues/QueueView";
 import { createClient } from "@/lib/supabase/server";
 import type { Metadata } from "next";
@@ -11,8 +10,9 @@ export default async function QueuesPage({
 }: {
   params: { storeId: string };
 }) {
-  const store = await getStoreById(params.storeId);
-  if (!store) notFound();
+  const guard = await guardStoreModule(params.storeId, "queues");
+  if (guard.denied) return guard.denied;
+  const { store } = guard;
 
   const supabase = createClient();
   const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
