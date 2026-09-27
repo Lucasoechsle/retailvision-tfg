@@ -1,7 +1,8 @@
 import { guardStoreModule } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { HeatmapView } from "@/components/heatmap/HeatmapView";
-import { isHeatmapSlot, isIsoDate, localDate, slotWindow, sumGrids } from "@/lib/heatmap";
+import { isHeatmapSlot, slotWindow, sumGrids } from "@/lib/heatmap";
+import { isIsoDate, localDate } from "@/lib/dates";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Mapa de Calor" };

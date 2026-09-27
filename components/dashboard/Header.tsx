@@ -2,7 +2,8 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { useRouter, usePathname } from "next/navigation";
-import { LogOut, Bell, ChevronRight } from "lucide-react";
+import { LogOut, ChevronRight } from "lucide-react";
+import { AlertBell } from "./AlertBell";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -19,6 +20,8 @@ interface HeaderProps {
   userName: string;
   userEmail?: string;
   roleLabel: string;
+  /** Solo los perfiles con acceso a Alertas ven la campana. */
+  showAlerts: boolean;
 }
 
 const routeLabels: Record<string, string> = {
@@ -41,7 +44,7 @@ const routeLabels: Record<string, string> = {
   benchmark: "Benchmark",
 };
 
-export function Header({ userName, userEmail, roleLabel }: HeaderProps) {
+export function Header({ userName, userEmail, roleLabel, showAlerts }: HeaderProps) {
   const router = useRouter();
   const pathname = usePathname();
   const supabase = createClient();
@@ -96,9 +99,7 @@ export function Header({ userName, userEmail, roleLabel }: HeaderProps) {
 
       {/* Right section */}
       <div className="flex items-center gap-3">
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
-        </Button>
+        {showAlerts && <AlertBell />}
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

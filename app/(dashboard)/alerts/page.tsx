@@ -17,12 +17,13 @@ export default async function AlertsPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Alertas</h1>
         <p className="mt-1 text-muted-foreground">
-          Reglas de alerta y notificaciones en tiempo real
+          Reglas, alertas en tiempo real e historial
         </p>
       </div>
       <AlertsView
         stores={stores}
         canManageRules={can(guard.session.role, "manage_alert_rules")}
+        canUpdateAlerts={can(guard.session.role, "update_alerts")}
       />
     </div>
   );

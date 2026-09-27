@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { Sidebar } from "@/components/dashboard/Sidebar";
 import { Header } from "@/components/dashboard/Header";
 import { getSession } from "@/lib/auth/session";
-import { ROLE_LABELS } from "@/lib/auth/roles";
+import { canAccessSection, ROLE_LABELS } from "@/lib/auth/roles";
 
 export default async function DashboardLayout({
   children,
@@ -50,6 +50,7 @@ export default async function DashboardLayout({
           userName={userName}
           userEmail={session.email ?? undefined}
           roleLabel={ROLE_LABELS[session.role]}
+          showAlerts={canAccessSection(session.role, "alerts")}
         />
         <main className="flex-1 overflow-y-auto bg-background p-6">
           {children}

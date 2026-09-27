@@ -39,12 +39,26 @@ export async function evaluateAlerts(
             trigger: context.type,
             values: context.data,
             rule_config: rule.config,
+            zone_id: affectedZoneId(rule, context),
           },
           status: "active",
         });
       }
     }
   }
+}
+
+/** Zona afectada por la alerta, para mostrarla en el panel (HU-12); null = toda la tienda. */
+function affectedZoneId(rule: AlertRule, context: AlertContext): string | null {
+  if (rule.rule_type === "zone_empty") return rule.config.zone_id ?? null;
+  if (rule.rule_type === "queue_length") {
+    const threshold = rule.config.max_people || 5;
+    const worst = (context.data.queues || [])
+      .filter((q: any) => q.people_in_queue > threshold)
+      .sort((a: any, b: any) => b.people_in_queue - a.people_in_queue)[0];
+    return worst?.zone_id ?? null;
+  }
+  return null;
 }
 
 async function hasRecentAlert(
