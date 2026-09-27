@@ -82,6 +82,13 @@ export function alertZone(data: Data, config: Config, zoneNames: Record<string, 
   return "Toda la tienda";
 }
 
+/** Tiempo sin conexión en la unidad más legible: minutos, horas o días. */
+function formatOffline(minutes: number): string {
+  if (minutes < 60) return `${minutes} min`;
+  if (minutes < 48 * 60) return `${Math.floor(minutes / 60)} h`;
+  return `${Math.floor(minutes / (24 * 60))} días`;
+}
+
 function formatWait(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = Math.round(seconds % 60);
@@ -108,7 +115,7 @@ export function alertDetail(ruleType: string, data: Data, config: Config): strin
     }
     case "device_offline":
       return data?.device
-        ? `${data.device} sin conexión${data.last_seen_minutes ? ` hace ${data.last_seen_minutes} min` : ""}`
+        ? `${data.device} sin conexión${data.last_seen_minutes ? ` hace ${formatOffline(data.last_seen_minutes)}` : ""}`
         : "Dispositivo sin conexión";
     case "zone_empty":
       return "Zona sin movimiento en el período";

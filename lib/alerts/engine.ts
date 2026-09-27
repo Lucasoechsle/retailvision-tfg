@@ -104,10 +104,10 @@ async function checkRule(rule: AlertRule, context: AlertContext): Promise<boolea
       return zone && zone.entries === 0 && zone.exits === 0;
     }
 
-    case "device_offline": {
-      if (context.type !== "heartbeat") return false;
+    case "device_offline":
+      // Un dispositivo caído no envía datos: esta regla se evalúa en la base cada minuto
+      // con pg_cron (check_offline_devices, migration_dispositivos_offline.sql).
       return false;
-    }
 
     case "traffic_anomaly": {
       if (context.type !== "counts") return false;
