@@ -1,24 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Map, Clock, Users, TrendingUp, Upload } from "lucide-react";
+import { Map, Upload } from "lucide-react";
 import { ZoneEditor } from "./ZoneEditor";
+import { ZoneAnalytics } from "./ZoneAnalytics";
 import { toast } from "sonner";
 import type { Store, Zone, FloorPlan } from "@/types";
-
-const zoneTypeLabels: Record<string, string> = {
-  aisle: "Pasillo",
-  checkout: "Caja",
-  entrance: "Entrada",
-  promo: "Promoción",
-  endcap: "Cabecera",
-  storage: "Depósito",
-  other: "Otro",
-};
 
 interface ZonesViewProps {
   store: Store;
@@ -94,10 +84,12 @@ export function ZonesView({ store, zones: initialZones, floorPlan, canEdit }: Zo
       </div>
 
       <Tabs defaultValue={canEdit ? "editor" : "analytics"}>
-        <TabsList>
-          {canEdit && <TabsTrigger value="editor">Editor</TabsTrigger>}
-          <TabsTrigger value="analytics">Analytics</TabsTrigger>
-        </TabsList>
+        {canEdit && (
+          <TabsList>
+            <TabsTrigger value="editor">Editor</TabsTrigger>
+            <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          </TabsList>
+        )}
 
         {canEdit && (
           <TabsContent value="editor" className="mt-4">
@@ -124,43 +116,7 @@ export function ZonesView({ store, zones: initialZones, floorPlan, canEdit }: Zo
               </CardContent>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {zones.map((zone) => (
-                <Card key={zone.id}>
-                  <CardHeader className="flex flex-row items-start justify-between pb-3">
-                    <div>
-                      <CardTitle className="text-base">{zone.name}</CardTitle>
-                      <Badge variant="outline" className="mt-1">
-                        {zoneTypeLabels[zone.zone_type] || zone.zone_type}
-                      </Badge>
-                    </div>
-                    <div
-                      className="h-4 w-4 rounded-full"
-                      style={{ backgroundColor: zone.color }}
-                    />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-3 gap-2 text-center text-sm">
-                      <div>
-                        <Users className="mx-auto h-4 w-4 text-muted-foreground mb-1" />
-                        <p className="font-medium">--</p>
-                        <p className="text-xs text-muted-foreground">Visitas</p>
-                      </div>
-                      <div>
-                        <Clock className="mx-auto h-4 w-4 text-muted-foreground mb-1" />
-                        <p className="font-medium">--</p>
-                        <p className="text-xs text-muted-foreground">Dwell</p>
-                      </div>
-                      <div>
-                        <TrendingUp className="mx-auto h-4 w-4 text-muted-foreground mb-1" />
-                        <p className="font-medium">--</p>
-                        <p className="text-xs text-muted-foreground">Engage</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
+            <ZoneAnalytics storeId={store.id} />
           )}
         </TabsContent>
       </Tabs>

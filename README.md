@@ -111,6 +111,7 @@ La base de datos se crea ejecutando en el SQL Editor de Supabase, en este orden:
 
 1. `supabase_schema_completo.sql` — 22 tablas, 18 funciones y las políticas de RLS.
 2. `migration_roles_baja_logica.sql` — perfiles de usuario, tiendas a cargo y baja lógica de tiendas.
+3. `migration_analisis_zonas.sql` — función de análisis de tráfico, dwell time y engagement por zona.
 
 Para crear los usuarios de demostración de cada perfil: `node scripts/seed-demo-roles.mjs`.
 
