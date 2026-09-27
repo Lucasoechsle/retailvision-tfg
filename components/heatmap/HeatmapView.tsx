@@ -1,9 +1,11 @@
 "use client";
 
-import { useRef, useEffect, useState, useCallback } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useRef, useEffect, useState, useCallback, useMemo, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -11,12 +13,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Map } from "lucide-react";
-import type { Store, ZoneHeatmap, FloorPlan, Zone } from "@/types";
+import { Flame, Map, Snowflake } from "lucide-react";
+import { HEATMAP_SLOTS, zoneIntensity, type HeatmapSlot } from "@/lib/heatmap";
+import type { Store, FloorPlan, Zone } from "@/types";
+
+interface ZoneTraffic {
+  id: string;
+  name: string;
+  color: string;
+  /** Tráfico promedio por área, relativo a la zona más caliente (= 100). */
+  intensity: number;
+}
 
 interface HeatmapViewProps {
   store: Store;
-  heatmaps: ZoneHeatmap[];
+  date: string;
+  slot: HeatmapSlot;
+  /** Suma de las grillas de calor de la fecha y franja elegidas (null = sin datos). */
+  grid: number[][] | null;
+  snapshots: number;
   floorPlan?: FloorPlan | null;
   zones?: Pick<Zone, "id" | "name" | "zone_type" | "polygon" | "color">[];
 }
@@ -30,13 +45,13 @@ function heatColor(value: number, alpha: number): string {
 }
 
 function HeatmapCanvas({
-  heatmap,
+  data,
   floorPlan,
   zones,
   opacity,
   showZones,
 }: {
-  heatmap: ZoneHeatmap;
+  data: number[][];
   floorPlan: FloorPlan | null;
   zones: Pick<Zone, "id" | "name" | "zone_type" | "polygon" | "color">[];
   opacity: number;
@@ -95,7 +110,6 @@ function HeatmapCanvas({
       }
     }
 
-    const data = heatmap.heatmap_data;
     const rows = data.length;
     const cols = rows > 0 ? data[0].length : 1;
     const cellW = canvas.width / cols;
@@ -169,7 +183,7 @@ function HeatmapCanvas({
         ctx.fillText(zone.name, tx, ty);
       }
     }
-  }, [heatmap, imgLoaded, opacity, showZones, zones]);
+  }, [data, imgLoaded, opacity, showZones, zones]);
 
   useEffect(() => {
     draw();
@@ -188,12 +202,95 @@ function HeatmapCanvas({
   );
 }
 
-export function HeatmapView({ store, heatmaps, floorPlan, zones }: HeatmapViewProps) {
-  const [selectedIdx, setSelectedIdx] = useState("0");
+function ZoneRanking({
+  title,
+  description,
+  icon: Icon,
+  zones,
+}: {
+  title: string;
+  description: string;
+  icon: typeof Flame;
+  zones: ZoneTraffic[];
+}) {
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Icon className="h-4 w-4 text-muted-foreground" />
+          {title}
+        </CardTitle>
+        <CardDescription>{description}</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ol className="space-y-3">
+          {zones.map((z, i) => (
+            <li key={z.id} className="space-y-1">
+              <div className="flex items-center justify-between gap-3 text-sm">
+                <span className="flex items-center gap-2">
+                  <span className="w-4 text-right tabular-nums text-muted-foreground">{i + 1}</span>
+                  <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: z.color }} />
+                  <span className="font-medium">{z.name}</span>
+                </span>
+                <span className="tabular-nums text-muted-foreground">
+                  intensidad {Math.round(z.intensity)}
+                </span>
+              </div>
+              <div className="ml-6 h-1.5 overflow-hidden rounded-full bg-muted">
+                <div
+                  className="h-full rounded-full"
+                  style={{ width: `${z.intensity}%`, backgroundColor: z.color }}
+                />
+              </div>
+            </li>
+          ))}
+        </ol>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function HeatmapView({
+  store,
+  date,
+  slot,
+  grid,
+  snapshots,
+  floorPlan,
+  zones,
+}: HeatmapViewProps) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   const [opacity, setOpacity] = useState([0.55]);
   const [showZones, setShowZones] = useState(true);
 
-  const latestHeatmap = heatmaps[parseInt(selectedIdx, 10)] || heatmaps[0];
+  const applyFilters = (nextDate: string, nextSlot: HeatmapSlot) => {
+    if (!nextDate) return;
+    startTransition(() => {
+      router.push(`/stores/${store.id}/heatmap?date=${nextDate}&slot=${nextSlot}`);
+    });
+  };
+
+  const dateLabel = new Date(`${date}T12:00:00`).toLocaleDateString("es-AR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+  const slotLabel = HEATMAP_SLOTS[slot].label.toLowerCase();
+
+  // HU-14: cinco zonas más y cinco menos visitadas, según el mismo mapa de calor que se muestra
+  const ranked = useMemo<ZoneTraffic[]>(() => {
+    if (!grid) return [];
+    const raw = (zones || []).map((z) => ({ ...z, value: zoneIntensity(grid, z.polygon) }));
+    const hottest = Math.max(0, ...raw.map((z) => z.value));
+    if (hottest <= 0) return [];
+    return raw
+      .map((z) => ({ id: z.id, name: z.name, color: z.color, intensity: (z.value / hottest) * 100 }))
+      .sort((a, b) => b.intensity - a.intensity);
+  }, [grid, zones]);
+  const mostVisited = ranked.slice(0, 5);
+  const leastVisited = [...ranked].reverse().slice(0, 5);
 
   return (
     <div className="space-y-6">
@@ -205,99 +302,129 @@ export function HeatmapView({ store, heatmaps, floorPlan, zones }: HeatmapViewPr
       <Card>
         <CardHeader>
           <CardTitle>Distribución de Tráfico</CardTitle>
+          <CardDescription className="first-letter:uppercase">
+            {dateLabel} · {slotLabel}
+            {grid && ` · ${snapshots} ${snapshots === 1 ? "captura" : "capturas"} del dispositivo`}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          {!latestHeatmap ? (
-            <div className="flex h-96 items-center justify-center">
-              <div className="text-center text-muted-foreground">
-                <Map className="mx-auto h-12 w-12 mb-4 opacity-50" />
-                <h3 className="text-lg font-medium">Sin datos de heatmap</h3>
-                <p className="mt-2 text-sm">
-                  Sube un plano de la tienda y conecta cámaras para visualizar
-                  patrones de tráfico.
-                </p>
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-end gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="heatmap-date" className="text-xs">Fecha</Label>
+                <Input
+                  id="heatmap-date"
+                  type="date"
+                  value={date}
+                  onChange={(e) => applyFilters(e.target.value, slot)}
+                  className="w-[170px]"
+                />
               </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs">Franja horaria</Label>
+                <Select value={slot} onValueChange={(v) => applyFilters(date, v as HeatmapSlot)}>
+                  <SelectTrigger className="w-[210px]">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(Object.keys(HEATMAP_SLOTS) as HeatmapSlot[]).map((key) => (
+                      <SelectItem key={key} value={key}>
+                        {HEATMAP_SLOTS[key].label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5 w-48">
+                <Label className="text-xs">
+                  Opacidad: {Math.round(opacity[0] * 100)}%
+                </Label>
+                <Slider
+                  value={opacity}
+                  onValueChange={setOpacity}
+                  min={0.1}
+                  max={1}
+                  step={0.05}
+                />
+              </div>
+
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showZones}
+                  onChange={(e) => setShowZones(e.target.checked)}
+                  className="rounded"
+                />
+                Mostrar zonas
+              </label>
+
+              {isPending && <span className="text-sm text-muted-foreground">Actualizando…</span>}
             </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-end gap-4">
-                {heatmaps.length > 1 && (
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">Periodo</Label>
-                    <Select value={selectedIdx} onValueChange={setSelectedIdx}>
-                      <SelectTrigger className="w-[200px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {heatmaps.map((h, i) => (
-                          <SelectItem key={h.id} value={String(i)}>
-                            {new Date(h.timestamp).toLocaleString("es", {
-                              dateStyle: "short",
-                              timeStyle: "short",
-                            })}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
 
-                <div className="space-y-1.5 w-48">
-                  <Label className="text-xs">
-                    Opacidad: {Math.round(opacity[0] * 100)}%
-                  </Label>
-                  <Slider
-                    value={opacity}
-                    onValueChange={setOpacity}
-                    min={0.1}
-                    max={1}
-                    step={0.05}
-                  />
+            {!grid ? (
+              <div className="flex h-96 items-center justify-center rounded-lg border border-dashed border-border">
+                <div className="text-center text-muted-foreground">
+                  <Map className="mx-auto h-12 w-12 mb-4 opacity-50" />
+                  <h3 className="text-lg font-medium">Sin datos de mapa de calor</h3>
+                  <p className="mt-2 text-sm">
+                    No hay capturas para esta fecha y franja horaria. Probá con otra fecha.
+                  </p>
                 </div>
+              </div>
+            ) : (
+              <div className={isPending ? "opacity-60 transition-opacity" : undefined}>
+                <HeatmapCanvas
+                  data={grid}
+                  floorPlan={floorPlan || null}
+                  zones={zones || []}
+                  opacity={opacity[0]}
+                  showZones={showZones}
+                />
+              </div>
+            )}
 
-                <label className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={showZones}
-                    onChange={(e) => setShowZones(e.target.checked)}
-                    className="rounded"
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>Bajo tráfico</span>
+              <div className="flex gap-0.5">
+                {[0, 0.15, 0.3, 0.5, 0.7, 0.85, 1.0].map((v) => (
+                  <div
+                    key={v}
+                    className="h-3 w-6 rounded-sm"
+                    style={{ backgroundColor: heatColor(v, 0.9) }}
                   />
-                  Mostrar zonas
-                </label>
+                ))}
               </div>
-
-              <HeatmapCanvas
-                heatmap={latestHeatmap}
-                floorPlan={floorPlan || null}
-                zones={zones || []}
-                opacity={opacity[0]}
-                showZones={showZones}
-              />
-
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>Bajo tráfico</span>
-                <div className="flex gap-0.5">
-                  {[0, 0.15, 0.3, 0.5, 0.7, 0.85, 1.0].map((v) => (
-                    <div
-                      key={v}
-                      className="h-3 w-6 rounded-sm"
-                      style={{ backgroundColor: heatColor(v, 0.9) }}
-                    />
-                  ))}
-                </div>
-                <span>Alto tráfico</span>
-              </div>
-
-              {!floorPlan?.image_url && (
-                <p className="text-xs text-muted-foreground text-center mt-2">
-                  Sube una imagen de plano en la configuración de la tienda para
-                  superponer el heatmap sobre el diseño real.
-                </p>
-              )}
+              <span>Alto tráfico</span>
             </div>
-          )}
+
+            {!floorPlan?.image_url && (
+              <p className="text-xs text-muted-foreground text-center mt-2">
+                Sube una imagen de plano en la configuración de la tienda para
+                superponer el heatmap sobre el diseño real.
+              </p>
+            )}
+          </div>
         </CardContent>
       </Card>
+
+      {ranked.length > 0 && (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <ZoneRanking
+            title="Zonas más visitadas"
+            description="Mayor tráfico promedio por área · la más caliente = 100"
+            icon={Flame}
+            zones={mostVisited}
+          />
+          <ZoneRanking
+            title="Zonas menos visitadas"
+            description="Menor tráfico promedio por área · la más caliente = 100"
+            icon={Snowflake}
+            zones={leastVisited}
+          />
+        </div>
+      )}
     </div>
   );
 }
