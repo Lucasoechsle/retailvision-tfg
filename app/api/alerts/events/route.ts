@@ -159,9 +159,9 @@ function csvResponse(events: AlertRow[], timeZone: string, storeLabel: string) {
   ]);
   const csv = [header, ...rows].map((r) => r.map(cell).join(";")).join("\r\n");
 
-  const slug = storeLabel.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, "-");
+  const slug = storeLabel.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-");
   const today = new Date().toISOString().slice(0, 10);
-  return new NextResponse("﻿" + csv, {
+  return new NextResponse("\uFEFF" + csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
       "Content-Disposition": `attachment; filename="alertas_${slug}_${today}.csv"`,
