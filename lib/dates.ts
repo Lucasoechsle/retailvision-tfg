@@ -37,3 +37,13 @@ export function dayRange(fromDate: string, toDate: string, timeZone: string): { 
     to: new Date(localMidnight(toDate, timeZone).getTime() + 24 * 3600000),
   };
 }
+
+/** Suma días a una fecha AAAA-MM-DD (sin zona horaria: es aritmética de calendario). */
+export function addDays(date: string, days: number): string {
+  return new Date(Date.parse(`${date}T00:00:00Z`) + days * 86400000).toISOString().slice(0, 10);
+}
+
+/** Cantidad de días entre dos fechas AAAA-MM-DD, contando ambas. */
+export function daysInclusive(from: string, to: string): number {
+  return Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / 86400000) + 1;
+}

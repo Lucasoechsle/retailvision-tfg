@@ -3,7 +3,6 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { MetricCard } from "@/components/dashboard/MetricCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,15 +24,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Users, DollarSign, ShoppingCart, TrendingUp, Plus, Upload, Download } from "lucide-react";
+import { ShoppingCart, Plus, Upload, Download } from "lucide-react";
+import { ConversionPerformance } from "./ConversionPerformance";
 import { toast } from "sonner";
 import type { Store, Transaction } from "@/types";
-
-interface ConversionStats {
-  totalVisitors: number;
-  totalTransactions: number;
-  totalRevenue: number;
-}
 
 interface ImportResult {
   imported: number;
@@ -61,10 +55,10 @@ function nowLocalInput(): string {
 interface ConversionViewProps {
   store: Store;
   transactions: Transaction[];
-  stats?: ConversionStats;
+  initialRange: { from: string; to: string };
 }
 
-export function ConversionView({ store, transactions, stats }: ConversionViewProps) {
+export function ConversionView({ store, transactions, initialRange }: ConversionViewProps) {
   const router = useRouter();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -73,13 +67,8 @@ export function ConversionView({ store, transactions, stats }: ConversionViewPro
   const [importing, setImporting] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
 
-  // Si hay stats agregados (del histórico) se usan; si no, fallback a las transacciones mostradas
-  const txCount = stats?.totalTransactions ?? transactions.length;
-  const totalRevenue =
-    stats?.totalRevenue ?? transactions.reduce((sum, t) => sum + Number(t.amount), 0);
-  const avgTicket = txCount > 0 ? totalRevenue / txCount : 0;
-  const conversionRate =
-    stats && stats.totalVisitors > 0 ? (stats.totalTransactions / stats.totalVisitors) * 100 : null;
+  // Se incrementa al cargar o importar transacciones para recalcular los indicadores
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const handleCreate = async () => {
     const amount = parseFloat(form.amount);
@@ -111,6 +100,7 @@ export function ConversionView({ store, transactions, stats }: ConversionViewPro
       toast.success("Transacción cargada");
       setForm({ amount: "", items_count: "1", timestamp: "" });
       setDialogOpen(false);
+      setRefreshKey((k) => k + 1);
       router.refresh();
     } catch (err: any) {
       toast.error(err.message || "Error al cargar la transacción");
@@ -131,6 +121,7 @@ export function ConversionView({ store, transactions, stats }: ConversionViewPro
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "No se pudo importar el archivo");
       setImportResult(data);
+      setRefreshKey((k) => k + 1);
       router.refresh();
     } catch (err: any) {
       toast.error(err.message);
@@ -256,29 +247,7 @@ export function ConversionView({ store, transactions, stats }: ConversionViewPro
         </DialogContent>
       </Dialog>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricCard
-          title="Conversión"
-          value={conversionRate !== null ? `${conversionRate.toFixed(1)}%` : "--"}
-          icon={TrendingUp}
-          description={conversionRate !== null ? "visitantes que compran" : "sin datos de visitantes"}
-        />
-        <MetricCard
-          title="Transacciones"
-          value={txCount.toLocaleString("es")}
-          icon={ShoppingCart}
-        />
-        <MetricCard
-          title="Revenue"
-          value={`$${totalRevenue.toLocaleString("es", { minimumFractionDigits: 0 })}`}
-          icon={DollarSign}
-        />
-        <MetricCard
-          title="Ticket Promedio"
-          value={`$${avgTicket.toFixed(0)}`}
-          icon={Users}
-        />
-      </div>
+      <ConversionPerformance storeId={store.id} initialRange={initialRange} refreshKey={refreshKey} />
 
       <Card>
         <CardHeader>

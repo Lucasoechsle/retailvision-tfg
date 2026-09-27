@@ -114,6 +114,7 @@ La base de datos se crea ejecutando en el SQL Editor de Supabase, en este orden:
 3. `migration_analisis_zonas.sql` — función de análisis de tráfico, dwell time y engagement por zona.
 4. `migration_dispositivos_offline.sql` — tarea programada (pg_cron) que detecta dispositivos sin conexión y genera la alerta.
 5. `migration_baja_dispositivos.sql` — baja lógica de dispositivos de borde.
+6. `migration_conversion.sql` — tasa de conversión diaria calculada desde los conteos y las transacciones.
 
 Para crear los usuarios de demostración de cada perfil: `node scripts/seed-demo-roles.mjs`.
 
