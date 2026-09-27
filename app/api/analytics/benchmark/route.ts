@@ -41,7 +41,8 @@ export async function GET(request: NextRequest) {
   const { data: devices } = await supabase
     .from("devices")
     .select("store_id, status")
-    .in("store_id", storeIds);
+    .in("store_id", storeIds)
+    .eq("is_active", true);
 
   const storeMetrics = stores.map((store) => {
     const storeSummaries = (summaries || []).filter((s) => s.store_id === store.id);

@@ -17,7 +17,7 @@ export async function GET(
 
   const [storeRes, devicesRes, countsRes, summaryRes] = await Promise.all([
     supabase.from("stores").select("*").eq("id", storeId).single(),
-    supabase.from("devices").select("id, status").eq("store_id", storeId),
+    supabase.from("devices").select("id, status").eq("store_id", storeId).eq("is_active", true),
     supabase
       .from("people_counts")
       .select("*")

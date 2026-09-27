@@ -20,6 +20,7 @@ export default async function StoreDevicesPage({
     .from("devices")
     .select("*")
     .eq("store_id", params.storeId)
+    .eq("is_active", true)
     .order("name");
 
   return <StoreDevicesView store={store} devices={devices || []} />;

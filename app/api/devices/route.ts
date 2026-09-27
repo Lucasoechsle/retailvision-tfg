@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createDeviceSchema } from "@/lib/schemas/device";
-import { randomBytes } from "crypto";
+import { generateDeviceKey } from "@/lib/data/devices";
 import { authorizeStore } from "@/lib/auth/api";
 
 export async function GET() {
@@ -19,6 +19,7 @@ export async function GET() {
     .from("devices")
     .select("*, stores!inner(name, organization_id)")
     .eq("stores.organization_id", profile?.organization_id)
+    .eq("is_active", true)
     .order("name");
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
@@ -38,7 +39,7 @@ export async function POST(request: NextRequest) {
 
   const supabase = createClient();
 
-  const apiKey = `rv_${randomBytes(24).toString("hex")}`;
+  const apiKey = generateDeviceKey();
 
   const { data: device, error } = await supabase
     .from("devices")

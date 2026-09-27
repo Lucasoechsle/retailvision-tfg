@@ -41,3 +41,29 @@ export async function authorizeStore(
 
   return { session: auth.session, store };
 }
+
+/** Como authorize, y además valida que el dispositivo exista, esté activo y su tienda sea visible para la sesión. */
+export async function authorizeDevice(
+  deviceId: string,
+  action?: Action
+): Promise<{ error?: undefined; session: Session; device: { id: string; name: string; store_id: string } } | Rejected> {
+  const auth = await authorize(action);
+  if (auth.error) return auth;
+
+  const supabase = createClient();
+  const { data: device } = await supabase
+    .from("devices")
+    .select("id, name, store_id, is_active, stores(id, is_active, organization_id)")
+    .eq("id", deviceId)
+    .maybeSingle();
+
+  const store = (device as any)?.stores;
+  if (!device || !device.is_active || !store || store.organization_id !== auth.session.organizationId) {
+    return reject("Dispositivo no encontrado", 404);
+  }
+  if (!canAccessStore(auth.session, store)) {
+    return reject("No tenés acceso a esta tienda", 403);
+  }
+
+  return { session: auth.session, device: { id: device.id, name: device.name, store_id: device.store_id } };
+}

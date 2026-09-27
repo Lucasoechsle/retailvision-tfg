@@ -1,5 +1,11 @@
+import { randomBytes } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import type { Device } from "@/types";
+
+/** Clave con la que el dispositivo se autentica en el header X-Device-Key (HU-05). */
+export function generateDeviceKey(): string {
+  return `rv_${randomBytes(24).toString("hex")}`;
+}
 
 export async function getDevicesByStore(storeId: string): Promise<Device[]> {
   const supabase = createClient();
@@ -7,6 +13,7 @@ export async function getDevicesByStore(storeId: string): Promise<Device[]> {
     .from("devices")
     .select("*")
     .eq("store_id", storeId)
+    .eq("is_active", true)
     .order("name");
 
   if (error) {
@@ -22,6 +29,7 @@ export async function getDevicesByOrg(orgId: string): Promise<(Device & { store_
     .from("devices")
     .select("*, stores!inner(name, organization_id)")
     .eq("stores.organization_id", orgId)
+    .eq("is_active", true)
     .order("name");
 
   if (error) {

@@ -26,6 +26,7 @@ export default async function DevicesPage() {
     .select("*, stores!inner(name, organization_id, is_active)")
     .eq("stores.organization_id", guard.session.organizationId)
     .eq("stores.is_active", true)
+    .eq("is_active", true)
     .order("name");
 
   const deviceList = devices || [];

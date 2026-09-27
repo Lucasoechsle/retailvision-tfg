@@ -40,6 +40,8 @@ export interface Device {
   status: "online" | "offline" | "error";
   last_seen_at: string | null;
   config: Record<string, unknown>;
+  /** false = dado de baja (baja lógica, se conserva el histórico). */
+  is_active: boolean;
   created_at: string;
   store?: Store;
 }

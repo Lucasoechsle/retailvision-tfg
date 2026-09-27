@@ -28,7 +28,7 @@ export default async function DashboardPage() {
     const today = new Date().toISOString().split("T")[0];
 
     const [devicesRes, summariesRes, alertsRes, campaignsRes, latestCounts] = await Promise.all([
-      supabase.from("devices").select("status").in("store_id", storeIds),
+      supabase.from("devices").select("status").in("store_id", storeIds).eq("is_active", true),
       supabase
         .from("daily_store_summaries")
         .select("total_visitors, total_transactions, conversion_rate")

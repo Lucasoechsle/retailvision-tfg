@@ -21,6 +21,7 @@ export default async function DeviceSetupPage({
     .select("id, name, store_id, status")
     .eq("id", params.deviceId)
     .eq("store_id", params.storeId)
+    .eq("is_active", true)
     .single();
 
   if (!device) notFound();
