@@ -7,11 +7,15 @@ export async function GET(
   _request: NextRequest,
   { params }: { params: { storeId: string } }
 ) {
+  const auth = await authorizeStore(params.storeId);
+  if (auth.error) return auth.error;
+
   const supabase = createClient();
   const { data: zones, error } = await supabase
     .from("zones")
     .select("*")
     .eq("store_id", params.storeId)
+    .eq("is_active", true)
     .order("sort_order");
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

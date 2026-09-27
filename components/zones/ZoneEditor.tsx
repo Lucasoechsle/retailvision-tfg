@@ -13,7 +13,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Plus, Trash2, Save, MousePointer2, Pencil } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Trash2, Save, MousePointer2, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import type { Zone, FloorPlan } from "@/types";
 
@@ -24,6 +32,7 @@ const ZONE_COLORS = [
 
 const ZONE_TYPES = [
   { value: "aisle", label: "Pasillo" },
+  { value: "gondola", label: "Góndola" },
   { value: "checkout", label: "Caja" },
   { value: "entrance", label: "Entrada" },
   { value: "promo", label: "Promoción" },
@@ -54,6 +63,26 @@ export function ZoneEditor({ storeId, floorPlan, zones, onZoneSaved }: ZoneEdito
   const [bgImage, setBgImage] = useState<HTMLImageElement | null>(null);
   const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
   const [saving, setSaving] = useState(false);
+  // Zona cuya forma se está redibujando (null = se está dibujando una zona nueva)
+  const [redrawZone, setRedrawZone] = useState<Zone | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editType, setEditType] = useState("aisle");
+  const [editColor, setEditColor] = useState(ZONE_COLORS[0]);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  // Cuando se recargan las zonas, la selección apunta a la versión actualizada
+  useEffect(() => {
+    setSelectedZone((prev) => (prev ? zones.find((z) => z.id === prev.id) ?? null : null));
+  }, [zones]);
+
+  // Al seleccionar una zona, se cargan sus datos en el formulario de edición
+  useEffect(() => {
+    if (selectedZone) {
+      setEditName(selectedZone.name);
+      setEditType(selectedZone.zone_type);
+      setEditColor(selectedZone.color);
+    }
+  }, [selectedZone]);
 
   useEffect(() => {
     if (floorPlan?.image_url) {
@@ -86,12 +115,14 @@ export function ZoneEditor({ storeId, floorPlan, zones, onZoneSaved }: ZoneEdito
     if (bgImage) {
       ctx.drawImage(bgImage, 0, 0, canvas.width, canvas.height);
     } else {
-      ctx.fillStyle = "hsl(var(--muted))";
+      ctx.fillStyle = themeColor("--muted", "#1e293b");
       ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.fillStyle = "hsl(var(--muted-foreground))";
-      ctx.font = "14px sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText("Sube un plano para comenzar", canvas.width / 2, canvas.height / 2);
+      if (zones.length === 0) {
+        ctx.fillStyle = themeColor("--muted-foreground", "#94a3b8");
+        ctx.font = "14px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText("Sube un plano para comenzar", canvas.width / 2, canvas.height / 2);
+      }
     }
 
     for (const zone of zones) {
@@ -167,9 +198,64 @@ export function ZoneEditor({ storeId, floorPlan, zones, onZoneSaved }: ZoneEdito
     }
   };
 
+  /** HU-08: modifica una zona existente; el edge toma el cambio sin reiniciarse. */
+  const patchZone = async (zoneId: string, changes: Record<string, unknown>, successMessage: string) => {
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/stores/${storeId}/zones/${zoneId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(changes),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error guardando la zona");
+      toast.success(successMessage);
+      onZoneSaved?.();
+      return true;
+    } catch (err: any) {
+      toast.error(err.message);
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleUpdateZone = () => {
+    if (!selectedZone) return;
+    if (!editName.trim()) {
+      toast.error("Nombre de zona requerido");
+      return;
+    }
+    patchZone(
+      selectedZone.id,
+      { name: editName.trim(), zone_type: editType, color: editColor },
+      `Zona "${editName.trim()}" actualizada`
+    );
+  };
+
+  const startRedraw = () => {
+    if (!selectedZone) return;
+    setRedrawZone(selectedZone);
+    setCurrentPoints([]);
+    setMode("draw");
+  };
+
   const handleSaveZone = async () => {
     if (currentPoints.length < 3) {
       toast.error("Necesitas al menos 3 puntos para crear una zona");
+      return;
+    }
+    if (redrawZone) {
+      const ok = await patchZone(
+        redrawZone.id,
+        { polygon: currentPoints },
+        `Forma de "${redrawZone.name}" actualizada`
+      );
+      if (ok) {
+        setCurrentPoints([]);
+        setRedrawZone(null);
+        setMode("select");
+      }
       return;
     }
     if (!newZoneName.trim()) {
@@ -209,20 +295,20 @@ export function ZoneEditor({ storeId, floorPlan, zones, onZoneSaved }: ZoneEdito
     }
   };
 
-  const handleDeleteZone = async (zoneId: string) => {
+  const handleDeleteZone = async (zone: Zone) => {
+    setSaving(true);
     try {
-      const res = await fetch(`/api/stores/${storeId}/zones`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ zoneId }),
-      });
-      if (res.ok) {
-        toast.success("Zona eliminada");
-        setSelectedZone(null);
-        onZoneSaved?.();
-      }
-    } catch {
-      toast.error("Error eliminando zona");
+      const res = await fetch(`/api/stores/${storeId}/zones/${zone.id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Error eliminando la zona");
+      toast.success(`Zona "${zone.name}" eliminada. Su histórico se conserva.`);
+      setConfirmDelete(false);
+      setSelectedZone(null);
+      onZoneSaved?.();
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -248,6 +334,7 @@ export function ZoneEditor({ storeId, floorPlan, zones, onZoneSaved }: ZoneEdito
                 setMode("draw");
                 setCurrentPoints([]);
                 setSelectedZone(null);
+                setRedrawZone(null);
               }}
             >
               <Pencil className="mr-1 h-4 w-4" />
@@ -278,20 +365,97 @@ export function ZoneEditor({ storeId, floorPlan, zones, onZoneSaved }: ZoneEdito
         {mode === "draw" && (
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="text-base">Nueva Zona</CardTitle>
+              <CardTitle className="text-base">
+                {redrawZone ? `Redibujar: ${redrawZone.name}` : "Nueva Zona"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {redrawZone ? (
+                <p className="text-sm text-muted-foreground">
+                  Marcá los vértices de la nueva forma sobre el plano (mínimo 3 puntos).
+                </p>
+              ) : (
+                <>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Nombre</Label>
+                    <Input
+                      placeholder="Góndola Lácteos"
+                      value={newZoneName}
+                      onChange={(e) => setNewZoneName(e.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Tipo</Label>
+                    <Select value={newZoneType} onValueChange={setNewZoneType}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ZONE_TYPES.map((t) => (
+                          <SelectItem key={t.value} value={t.value}>
+                            {t.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs">Color</Label>
+                    <div className="flex flex-wrap gap-2">
+                      {ZONE_COLORS.map((c) => (
+                        <button
+                          key={c}
+                          onClick={() => setNewZoneColor(c)}
+                          className={`h-6 w-6 rounded-full border-2 ${
+                            newZoneColor === c ? "border-white" : "border-transparent"
+                          }`}
+                          style={{ backgroundColor: c }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
+              <div className="flex gap-2 pt-2">
+                <Button
+                  size="sm"
+                  onClick={handleSaveZone}
+                  disabled={currentPoints.length < 3 || (!redrawZone && !newZoneName) || saving}
+                  className="flex-1"
+                >
+                  <Save className="mr-1 h-4 w-4" />
+                  {saving ? "Guardando..." : "Guardar"}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setCurrentPoints([]);
+                    setRedrawZone(null);
+                    setMode("select");
+                  }}
+                >
+                  Cancelar
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* HU-08: edición de la zona seleccionada */}
+        {mode === "select" && selectedZone && (
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Zona seleccionada</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="space-y-1.5">
                 <Label className="text-xs">Nombre</Label>
-                <Input
-                  placeholder="Góndola Lácteos"
-                  value={newZoneName}
-                  onChange={(e) => setNewZoneName(e.target.value)}
-                />
+                <Input value={editName} onChange={(e) => setEditName(e.target.value)} />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-xs">Tipo</Label>
-                <Select value={newZoneType} onValueChange={setNewZoneType}>
+                <Select value={editType} onValueChange={setEditType}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -310,39 +474,66 @@ export function ZoneEditor({ storeId, floorPlan, zones, onZoneSaved }: ZoneEdito
                   {ZONE_COLORS.map((c) => (
                     <button
                       key={c}
-                      onClick={() => setNewZoneColor(c)}
+                      type="button"
+                      aria-label={`Color ${c}`}
+                      onClick={() => setEditColor(c)}
                       className={`h-6 w-6 rounded-full border-2 ${
-                        newZoneColor === c ? "border-white" : "border-transparent"
+                        editColor === c ? "border-white" : "border-transparent"
                       }`}
                       style={{ backgroundColor: c }}
                     />
                   ))}
                 </div>
               </div>
-              <div className="flex gap-2 pt-2">
-                <Button
-                  size="sm"
-                  onClick={handleSaveZone}
-                  disabled={currentPoints.length < 3 || !newZoneName || saving}
-                  className="flex-1"
-                >
-                  <Save className="mr-1 h-4 w-4" />
-                  {saving ? "Guardando..." : "Guardar"}
+              <Button size="sm" className="w-full" onClick={handleUpdateZone} disabled={saving}>
+                <Save className="mr-1 h-4 w-4" />
+                {saving ? "Guardando..." : "Guardar cambios"}
+              </Button>
+              <div className="flex gap-2">
+                <Button size="sm" variant="outline" className="flex-1" onClick={startRedraw}>
+                  <Pencil className="mr-1 h-4 w-4" />
+                  Redibujar
                 </Button>
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => {
-                    setCurrentPoints([]);
-                    setMode("select");
-                  }}
+                  className="flex-1 text-destructive"
+                  onClick={() => setConfirmDelete(true)}
                 >
-                  Cancelar
+                  <Trash2 className="mr-1 h-4 w-4" />
+                  Eliminar
                 </Button>
               </div>
+              <p className="text-xs text-muted-foreground">
+                El dispositivo toma los cambios en su próxima consulta de configuración, sin reiniciarse.
+              </p>
             </CardContent>
           </Card>
         )}
+
+        <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>¿Eliminar la zona {selectedZone?.name}?</DialogTitle>
+              <DialogDescription>
+                La zona deja de analizarse y de enviarse al dispositivo, pero se conserva su
+                histórico de visitas y permanencia.
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setConfirmDelete(false)}>
+                Cancelar
+              </Button>
+              <Button
+                variant="destructive"
+                disabled={saving}
+                onClick={() => selectedZone && handleDeleteZone(selectedZone)}
+              >
+                {saving ? "Eliminando..." : "Eliminar zona"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Zone list */}
         <Card>
@@ -378,24 +569,9 @@ export function ZoneEditor({ storeId, floorPlan, zones, onZoneSaved }: ZoneEdito
                       />
                       <span className="font-medium">{zone.name}</span>
                     </div>
-                    <div className="flex items-center gap-1">
-                      <Badge variant="outline" className="text-[10px]">
-                        {ZONE_TYPES.find((t) => t.value === zone.zone_type)?.label}
-                      </Badge>
-                      {selectedZone?.id === zone.id && (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-6 w-6"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteZone(zone.id);
-                          }}
-                        >
-                          <Trash2 className="h-3 w-3 text-destructive" />
-                        </Button>
-                      )}
-                    </div>
+                    <Badge variant="outline" className="text-[10px]">
+                      {ZONE_TYPES.find((t) => t.value === zone.zone_type)?.label || zone.zone_type}
+                    </Badge>
                   </div>
                 ))}
               </div>
@@ -405,6 +581,15 @@ export function ZoneEditor({ storeId, floorPlan, zones, onZoneSaved }: ZoneEdito
       </div>
     </div>
   );
+}
+
+/**
+ * El canvas no interpreta variables CSS: "hsl(var(--muted))" se ignora y el fondo
+ * quedaba del último color usado. Se resuelve la variable al color concreto del tema.
+ */
+function themeColor(variable: string, fallback: string): string {
+  const value = getComputedStyle(document.documentElement).getPropertyValue(variable).trim();
+  return value ? `hsl(${value.split(/\s+/).join(", ")})` : fallback;
 }
 
 function isPointInPolygon(point: Point, polygon: Point[]): boolean {

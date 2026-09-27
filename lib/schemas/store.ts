@@ -1,14 +1,23 @@
 import { z } from "zod";
 
-export const createStoreSchema = z.object({
+const storeFields = {
   name: z.string().min(2, "Mínimo 2 caracteres"),
   address: z.string().optional(),
-  timezone: z.string().default("America/Argentina/Cordoba"),
-  opening_time: z.string().default("09:00"),
-  closing_time: z.string().default("21:00"),
+  timezone: z.string(),
+  opening_time: z.string(),
+  closing_time: z.string(),
+};
+
+export const createStoreSchema = z.object({
+  ...storeFields,
+  timezone: storeFields.timezone.default("America/Argentina/Cordoba"),
+  opening_time: storeFields.opening_time.default("09:00"),
+  closing_time: storeFields.closing_time.default("21:00"),
 });
 
-export const updateStoreSchema = createStoreSchema.partial().extend({
+// Sin valores por defecto: en zod 4, partial() igual los aplica y una actualización
+// parcial (por ejemplo, reactivar la tienda) pisaría el horario y la zona horaria.
+export const updateStoreSchema = z.object(storeFields).partial().extend({
   // HU-04: false = baja lógica, true = reactivación (se conserva el histórico)
   is_active: z.boolean().optional(),
 });

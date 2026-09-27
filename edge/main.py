@@ -1,5 +1,6 @@
 import cv2
 import asyncio
+import json
 import sys
 import time
 import socket
@@ -57,6 +58,51 @@ async def fetch_device_config():
     except Exception as e:
         print(f"[!] Could not fetch device config: {e}")
     return result
+
+
+def zones_signature(zones):
+    """Firma de la configuración de zonas: cambia si se agrega, borra o modifica alguna."""
+    relevant = [
+        {k: z.get(k) for k in ("id", "name", "zone_type", "polygon")}
+        for z in zones
+    ]
+    return json.dumps(sorted(relevant, key=lambda z: str(z["id"])), sort_keys=True)
+
+
+def build_zone_trackers(zones, frame_w, frame_h):
+    """Crea los trackers que dependen de las zonas (o None si no hay zonas)."""
+    if not zones:
+        return None, None, None, None
+    zone_tracker = ZoneTracker(
+        zones, frame_w, frame_h,
+        pass_threshold=config.DWELL_PASS_THRESHOLD,
+        browse_threshold=config.DWELL_BROWSE_THRESHOLD,
+    )
+    journey_tracker = JourneyTracker(zones, lost_timeout=config.JOURNEY_LOST_TIMEOUT)
+    queue_detector = QueueDetector(zones, avg_service_time=config.AVG_SERVICE_TIME)
+    shelf_heatmap = ShelfHeatmap(
+        zones, frame_w, frame_h,
+        default_rows=config.SHELF_DEFAULT_ROWS,
+        default_cols=config.SHELF_DEFAULT_COLS,
+    )
+    return zone_tracker, journey_tracker, queue_detector, shelf_heatmap
+
+
+async def flush_zone_trackers(uploader, zone_tracker, journey_tracker, shelf_heatmap):
+    """Sube los datos pendientes de las zonas actuales antes de reemplazar los trackers."""
+    if zone_tracker:
+        zone_data = zone_tracker.get_zone_data()
+        if any(z["entries"] or z["exits"] or z["dwell_events"] for z in zone_data):
+            await uploader.upload_zone_data(zone_data)
+    if journey_tracker:
+        journey_tracker.force_flush()
+        journeys = journey_tracker.get_completed_journeys()
+        if journeys:
+            await uploader.upload_journeys(journeys, journey_tracker.get_transitions())
+    if shelf_heatmap and shelf_heatmap.has_gondola_zones:
+        shelf_data = shelf_heatmap.get_shelf_data()
+        if shelf_data:
+            await uploader.upload_shelf_heatmap(shelf_data)
 
 
 async def upload_data(uploader, counter, heatmap, zone_tracker, health,
@@ -163,27 +209,10 @@ async def main():
     health = HealthMonitor()
     health.update_cameras(1, 1)
 
-    zone_tracker = None
-    journey_tracker = None
-    queue_detector = None
-    shelf_heatmap_tracker = None
+    zone_tracker, journey_tracker, queue_detector, shelf_heatmap_tracker = (
+        build_zone_trackers(zones_list, frame_w, frame_h)
+    )
     if zones_list:
-        zone_tracker = ZoneTracker(
-            zones_list, frame_w, frame_h,
-            pass_threshold=config.DWELL_PASS_THRESHOLD,
-            browse_threshold=config.DWELL_BROWSE_THRESHOLD,
-        )
-        journey_tracker = JourneyTracker(
-            zones_list, lost_timeout=config.JOURNEY_LOST_TIMEOUT,
-        )
-        queue_detector = QueueDetector(
-            zones_list, avg_service_time=config.AVG_SERVICE_TIME,
-        )
-        shelf_heatmap_tracker = ShelfHeatmap(
-            zones_list, frame_w, frame_h,
-            default_rows=config.SHELF_DEFAULT_ROWS,
-            default_cols=config.SHELF_DEFAULT_COLS,
-        )
         checkout_count = len(queue_detector.checkout_zones)
         gondola_count = len(shelf_heatmap_tracker.gondola_zones)
         print(f"[OK] {len(zones_list)} zones loaded ({checkout_count} checkout, {gondola_count} gondola)")
@@ -255,32 +284,25 @@ async def main():
                 last_config_check = time.time()
                 try:
                     new_cfg = await fetch_device_config()
-                    new_line = new_cfg.get("line_config")
-                    if new_line and new_line != line_config:
-                        counter.update_line(new_line)
-                        line_config = new_line
-                        print("[OK] Counting line config reloaded")
+                    # device_id None = no se pudo consultar el backend: se mantiene la config actual
+                    if new_cfg["device_id"] is not None:
+                        new_line = new_cfg.get("line_config")
+                        if new_line and new_line != line_config:
+                            counter.update_line(new_line)
+                            line_config = new_line
+                            print("[OK] Counting line config reloaded")
 
-                    new_zones = new_cfg.get("zones", [])
-                    if new_zones and len(new_zones) != len(zones_list):
-                        zone_tracker = ZoneTracker(
-                            new_zones, frame_w, frame_h,
-                            pass_threshold=config.DWELL_PASS_THRESHOLD,
-                            browse_threshold=config.DWELL_BROWSE_THRESHOLD,
-                        )
-                        journey_tracker = JourneyTracker(
-                            new_zones, lost_timeout=config.JOURNEY_LOST_TIMEOUT,
-                        )
-                        queue_detector = QueueDetector(
-                            new_zones, avg_service_time=config.AVG_SERVICE_TIME,
-                        )
-                        shelf_heatmap_tracker = ShelfHeatmap(
-                            new_zones, frame_w, frame_h,
-                            default_rows=config.SHELF_DEFAULT_ROWS,
-                            default_cols=config.SHELF_DEFAULT_COLS,
-                        )
-                        zones_list = new_zones
-                        print(f"[OK] Zones reloaded: {len(zones_list)} zones")
+                        # HU-08: se recarga si se agregó, borró o modificó cualquier zona
+                        new_zones = new_cfg.get("zones", [])
+                        if zones_signature(new_zones) != zones_signature(zones_list):
+                            await flush_zone_trackers(
+                                uploader, zone_tracker, journey_tracker, shelf_heatmap_tracker,
+                            )
+                            zone_tracker, journey_tracker, queue_detector, shelf_heatmap_tracker = (
+                                build_zone_trackers(new_zones, frame_w, frame_h)
+                            )
+                            zones_list = new_zones
+                            print(f"[OK] Zones reloaded: {len(zones_list)} zones")
                 except Exception as e:
                     print(f"[!] Config reload failed: {e}")
 
