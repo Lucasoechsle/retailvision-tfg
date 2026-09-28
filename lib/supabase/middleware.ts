@@ -33,7 +33,8 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const publicPaths = ['/', '/login', '/register'];
+  // HU-03: la recuperación de contraseña se usa sin sesión (el enlace del correo la abre)
+  const publicPaths = ['/', '/login', '/register', '/forgot-password', '/reset-password'];
   const isPublicPath = publicPaths.includes(request.nextUrl.pathname);
 
   if (!user && !isPublicPath && !request.nextUrl.pathname.startsWith('/api')) {

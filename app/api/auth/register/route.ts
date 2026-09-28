@@ -4,7 +4,8 @@ import { registerSchema } from "@/lib/schemas/auth";
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    // HU-01: los mismos requisitos de contraseña que en el formulario, validados en el servidor
+    const body = await request.json().catch(() => null);
     const parsed = registerSchema.safeParse(body);
 
     if (!parsed.success) {
@@ -26,7 +27,11 @@ export async function POST(request: NextRequest) {
       });
 
     if (authError) {
-      return NextResponse.json({ error: authError.message }, { status: 400 });
+      const exists =
+        (authError as { code?: string }).code === "email_exists" || /already|registered|exists/i.test(authError.message);
+      return exists
+        ? NextResponse.json({ error: "Ya existe una cuenta con ese correo" }, { status: 409 })
+        : NextResponse.json({ error: "No se pudo crear el usuario. Revisá los datos e intentá de nuevo." }, { status: 400 });
     }
 
     if (!authData.user) {

@@ -10,6 +10,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Eye } from "lucide-react";
 import { toast } from "sonner";
 import { registerSchema } from "@/lib/schemas/auth";
+import { createClient } from "@/lib/supabase/client";
+import { PasswordChecklist } from "@/components/auth/PasswordChecklist";
 
 export default function RegisterPage() {
   const [fullName, setFullName] = useState("");
@@ -43,8 +45,20 @@ export default function RegisterPage() {
         throw new Error(data.error || "Error al crear cuenta");
       }
 
-      toast.success("Cuenta creada. Revisa tu email para confirmar.");
-      router.push("/login");
+      // HU-01: con la organización creada, el administrador entra directo al dashboard
+      const supabase = createClient();
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: parsed.data.email,
+        password: parsed.data.password,
+      });
+      if (signInError) {
+        toast.success("Cuenta creada. Iniciá sesión para continuar.");
+        router.push("/login");
+        return;
+      }
+      toast.success("Cuenta creada");
+      router.push("/dashboard");
+      router.refresh();
     } catch (err: any) {
       toast.error(err.message || "Error al crear la cuenta");
     } finally {
@@ -104,9 +118,9 @@ export default function RegisterPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                minLength={6}
+                autoComplete="new-password"
               />
-              <p className="text-xs text-muted-foreground">Mínimo 6 caracteres</p>
+              <PasswordChecklist password={password} context={{ email, fullName, organizationName }} />
             </div>
           </CardContent>
           <CardFooter className="flex flex-col gap-4">

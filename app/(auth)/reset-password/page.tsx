@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -10,28 +10,38 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Eye } from "lucide-react";
 import { toast } from "sonner";
-
-// Validación consistente con la política de seguridad (E3): 8+ caracteres,
-// mayúscula, minúscula, número y un carácter especial.
-function validatePassword(pw: string): string | null {
-  if (pw.length < 8) return "La contraseña debe tener al menos 8 caracteres";
-  if (!/[A-Z]/.test(pw)) return "Debe incluir al menos una mayúscula";
-  if (!/[a-z]/.test(pw)) return "Debe incluir al menos una minúscula";
-  if (!/[0-9]/.test(pw)) return "Debe incluir al menos un número";
-  if (!/[^A-Za-z0-9]/.test(pw)) return "Debe incluir al menos un carácter especial";
-  return null;
-}
+import { passwordError, type PasswordContext } from "@/lib/schemas/auth";
+import { PasswordChecklist } from "@/components/auth/PasswordChecklist";
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
+  const [context, setContext] = useState<PasswordContext>({});
   const router = useRouter();
-  const supabase = createClient();
+
+  // Datos del usuario que la contraseña no puede contener (la sesión la abre el enlace)
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
+      if (!user) return;
+      const { data: profile } = await supabase
+        .from("user_profiles")
+        .select("full_name, organizations(name)")
+        .eq("id", user.id)
+        .maybeSingle();
+      const org = profile?.organizations as { name?: string } | { name?: string }[] | null | undefined;
+      setContext({
+        email: user.email,
+        fullName: profile?.full_name,
+        organizationName: Array.isArray(org) ? org[0]?.name : org?.name,
+      });
+    });
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const err = validatePassword(password);
+    const err = passwordError(password, context);
     if (err) {
       toast.error(err);
       return;
@@ -42,8 +52,14 @@ export default function ResetPasswordPage() {
     }
     setLoading(true);
     try {
-      const { error } = await supabase.auth.updateUser({ password });
-      if (error) throw error;
+      // El servidor vuelve a validar los requisitos antes de guardarla
+      const res = await fetch("/api/auth/update-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
       toast.success("Contraseña actualizada correctamente");
       router.push("/dashboard");
       router.refresh();
@@ -75,7 +91,9 @@ export default function ResetPasswordPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                autoComplete="new-password"
               />
+              <PasswordChecklist password={password} context={context} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirm">Confirmar contraseña</Label>
@@ -88,9 +106,6 @@ export default function ResetPasswordPage() {
                 required
               />
             </div>
-            <p className="text-xs text-muted-foreground">
-              Mínimo 8 caracteres, con mayúscula, minúscula, número y un carácter especial.
-            </p>
           </CardContent>
           <CardFooter className="flex flex-col gap-4">
             <Button type="submit" className="w-full" disabled={loading}>

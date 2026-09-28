@@ -36,12 +36,20 @@ export default function LoginPage() {
         password: parsed.data.password,
       });
 
-      if (error) throw error;
+      // HU-02: el mismo mensaje para correo inexistente o contraseña incorrecta
+      if (error) {
+        toast.error(
+          error.status && error.status < 500
+            ? "Correo o contraseña incorrectos"
+            : "No se pudo iniciar sesión. Intentá de nuevo en unos minutos."
+        );
+        return;
+      }
 
       router.push("/dashboard");
       router.refresh();
-    } catch (err: any) {
-      toast.error(err.message || "Error al iniciar sesión");
+    } catch {
+      toast.error("No se pudo iniciar sesión. Revisá tu conexión e intentá de nuevo.");
     } finally {
       setLoading(false);
     }
