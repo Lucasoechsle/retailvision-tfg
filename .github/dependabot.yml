@@ -1,0 +1,46 @@
+# R-12 (vulnerabilidades en dependencias de terceros), plan de contingencia:
+# Dependabot detecta dependencias con vulnerabilidades y abre pull requests con la
+# versión corregida. Las actualizaciones de versión se proponen una vez por mes, que
+# es la revisión mensual de las dependencias críticas (Next.js, Supabase, Ultralytics).
+version: 2
+updates:
+  # Plataforma web (Next.js + Supabase)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 10
+    groups:
+      criticas-web:
+        patterns:
+          - "next"
+          - "eslint-config-next"
+          - "@supabase/*"
+      resto-web:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "next"
+          - "eslint-config-next"
+          - "@supabase/*"
+        update-types:
+          - "minor"
+          - "patch"
+
+  # Pipeline de visión en el dispositivo de borde (Python)
+  - package-ecosystem: "pip"
+    directory: "/edge"
+    schedule:
+      interval: "monthly"
+    groups:
+      criticas-edge:
+        patterns:
+          - "ultralytics"
+          - "opencv-python"
+          - "numpy"
+
+  # Acciones de GitHub usadas por la auditoría
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"

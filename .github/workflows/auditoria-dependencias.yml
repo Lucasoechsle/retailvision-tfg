@@ -1,0 +1,39 @@
+# R-12: npm audit y pip-audit antes de cada release (al publicar un tag v*),
+# una vez por mes y a pedido desde la pestaña Actions. Falla si hay vulnerabilidades
+# altas o críticas en las dependencias que se despliegan.
+name: Auditoría de dependencias
+
+on:
+  push:
+    tags:
+      - "v*"
+  schedule:
+    - cron: "0 12 1 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    name: Plataforma web (npm audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm audit --omit=dev --audit-level=high
+
+  edge:
+    name: Dispositivo de borde (pip-audit)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - run: pip install pip-audit
+      - run: pip-audit -r edge/requirements.txt

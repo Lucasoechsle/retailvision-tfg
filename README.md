@@ -139,6 +139,13 @@ python main.py
 
 `CAMERA_SOURCE` acepta el índice de una webcam (`0`), la ruta a un archivo de video o una URL RTSP de una cámara IP.
 
+## Seguridad de dependencias (R-12)
+
+Plan de contingencia del riesgo R-12 (vulnerabilidades en dependencias de terceros):
+
+- **Dependabot** (`.github/dependabot.yml`) revisa las dependencias de la plataforma web (npm), del dispositivo de borde (pip, carpeta `edge/`) y de las acciones de GitHub. Propone las actualizaciones una vez por mes, agrupando las críticas (Next.js, Supabase y Ultralytics con OpenCV y NumPy). Para que además abra los arreglos de seguridad apenas se publica un aviso, hay que activar *Dependabot alerts* y *Dependabot security updates* en Settings → Code security del repositorio.
+- **Auditoría antes de cada release**: `npm run audit:web` (`npm audit` de las dependencias que se despliegan) y `npm run audit:edge` (`pip-audit` del edge, requiere `pip install pip-audit`). El workflow `.github/workflows/auditoria-dependencias.yml` corre las dos al publicar un tag `v*`, el día 1 de cada mes y a pedido; falla si encuentra vulnerabilidades altas o críticas.
+
 ## Estado del proyecto
 
 Prototipo **completo y operativo**, desplegado en producción. Cubre los cinco objetivos específicos del TFG: pipeline de visión sobre edge, conteo de personas, mapas de calor, análisis por zonas y dashboard multi-tenant.
