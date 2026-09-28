@@ -115,8 +115,11 @@ La base de datos se crea ejecutando en el SQL Editor de Supabase, en este orden:
 4. `migration_dispositivos_offline.sql` — tarea programada (pg_cron) que detecta dispositivos sin conexión y genera la alerta.
 5. `migration_baja_dispositivos.sql` — baja lógica de dispositivos de borde.
 6. `migration_conversion.sql` — tasa de conversión diaria calculada desde los conteos y las transacciones.
+7. `migration_resumenes_diarios.sql` — tarea programada que recalcula los resúmenes diarios cada 5 minutos.
 
 Para crear los usuarios de demostración de cada perfil: `node scripts/seed-demo-roles.mjs`.
+
+Antes de una demo, `refresh_demo_dates.sql` mueve los datos de demostración para que su último día sea hoy.
 
 ### 2. Pipeline de visión (edge)
 
