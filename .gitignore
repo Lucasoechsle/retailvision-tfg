@@ -49,3 +49,14 @@ nul
 next-env.d.ts
 
 .vercel
+
+# herramientas locales y documentos personales de la tesis (no van al repositorio)
+.claude/
+MASTER_PROMPT.md
+TESIS_MASTER_DOCUMENT.md
+ENTREGA_1_TFG.md
+Entrega_1_TFG_RetailVision.docx
+blueprint.md
+GUION_DEMO_DEFENSA.md
+demo.ps1
+scripts/generar_entrega1.py

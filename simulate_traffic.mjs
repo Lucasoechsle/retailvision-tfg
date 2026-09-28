@@ -4,12 +4,17 @@
 //  estuviera detectando gente. Ideal para demo/screenshots
 //  sin necesidad de la webcam.
 //
-//  Uso:   node simulate_traffic.mjs
+//  Uso:   DEVICE_KEY=<clave del dispositivo> node simulate_traffic.mjs
+//         (la clave se ve al dar de alta o regenerar el dispositivo)
 //  Frená: Ctrl+C
 // ============================================================
 
 const BACKEND = process.env.BACKEND_URL || "http://localhost:3000";
-const DEVICE_KEY = process.env.DEVICE_KEY || "rv_3f0fbe1be2ba1d0f8b370fba5f55245b";
+const DEVICE_KEY = process.env.DEVICE_KEY;
+if (!DEVICE_KEY) {
+  console.error("Falta DEVICE_KEY: la clave del dispositivo que simula la cámara.");
+  process.exit(1);
+}
 const INTERVAL_MS = 3500; // cada cuánto pushea
 
 let inside = 3; // ocupación inicial
