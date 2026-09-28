@@ -118,10 +118,11 @@ La base de datos se crea ejecutando en el SQL Editor de Supabase, en este orden:
 7. `migration_resumenes_diarios.sql` — tarea programada que recalcula los resúmenes diarios cada 5 minutos.
 8. `migration_trafico.sql` — entradas y salidas por día y franja horaria, en la zona horaria de la tienda.
 9. `migration_zona_horaria.sql` — horas y días de los resúmenes, el análisis temporal y los recorridos en la zona horaria de cada tienda.
+10. `migration_campanias.sql` — categoría, costo de exhibición y resultados de las campañas promocionales.
 
 Para crear los usuarios de demostración de cada perfil: `node scripts/seed-demo-roles.mjs`.
 
-Datos de demostración, una sola vez: `seed_historial_demo.sql` genera 9 semanas de historial antes de la semana de demostración, para que las comparaciones con la semana o el período anterior tengan datos, y `fix_horario_demo.sql` pasa los datos generados a la hora de la tienda (se habían guardado con la hora local como si fuera UTC).
+Datos de demostración, una sola vez: `seed_historial_demo.sql` genera 9 semanas de historial antes de la semana de demostración, para que las comparaciones con la semana o el período anterior tengan datos, `fix_horario_demo.sql` pasa los datos generados a la hora de la tienda (se habían guardado con la hora local como si fuera UTC) y `seed_campanias_demo.sql` agrega el historial por zona y ubica las campañas de ejemplo dentro de los datos.
 
 Antes de una demo, `refresh_demo_dates.sql` mueve los datos de demostración para que su último día sea hoy.
 

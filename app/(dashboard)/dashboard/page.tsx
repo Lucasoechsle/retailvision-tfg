@@ -3,6 +3,7 @@ import { getAccessibleStores, getSession } from "@/lib/auth/session";
 import { DashboardOverview } from "@/components/dashboard/DashboardOverview";
 import { createClient } from "@/lib/supabase/server";
 import { localDate, localMidnight, storeTimeZone } from "@/lib/dates";
+import { campaignStatus } from "@/lib/campaigns";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Overview" };
@@ -44,9 +45,9 @@ export default async function DashboardPage() {
         .eq("status", "active"),
       supabase
         .from("campaigns")
-        .select("id", { count: "exact", head: true })
+        .select("store_id, start_date, end_date, status")
         .in("store_id", storeIds)
-        .eq("status", "active"),
+        .neq("status", "cancelled"),
       Promise.all(
         storeIds.map((id) =>
           supabase
@@ -64,7 +65,10 @@ export default async function DashboardPage() {
     devicesTotal = deviceList.length;
     devicesOnline = deviceList.filter((d) => d.status === "online").length;
     activeAlerts = alertsRes.count || 0;
-    activeCampaigns = campaignsRes.count || 0;
+    // Activa según sus fechas y el día de hoy de cada sucursal (HU-17)
+    activeCampaigns = (campaignsRes.data || []).filter(
+      (c) => campaignStatus(c, todayByStore.get(c.store_id)!) === "active"
+    ).length;
     currentInside = latestCounts.reduce((s, r) => s + (r.data?.current_inside || 0), 0);
 
     const summaries = (summariesRes.data || []).filter((s) => todayByStore.get(s.store_id) === s.date);

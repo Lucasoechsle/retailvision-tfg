@@ -71,6 +71,15 @@ BEGIN
          resolved_at  = CASE WHEN resolved_at IS NOT NULL THEN resolved_at + v_off END
    WHERE triggered_at < v_cut;
 
+  -- Campañas de ejemplo: sus fechas acompañan a los datos (siguen finalizada, activa y planificada)
+  UPDATE campaigns
+     SET start_date     = start_date + v_days,
+         end_date       = end_date + v_days,
+         baseline_start = baseline_start + v_days,
+         baseline_end   = baseline_end + v_days,
+         results        = NULL
+   WHERE created_at < v_cut;
+
   -- Resúmenes diarios: se recalculan desde los datos de origen ya movidos,
   -- desde el primer día de demo (incluye el historial de seed_historial_demo.sql)
   SELECT public.store_today(v_store) - (MIN("timestamp") AT TIME ZONE v_tz)::DATE INTO v_span

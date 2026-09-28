@@ -1,49 +1,28 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useState } from "react";
+import { toast } from "sonner";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
+import { Megaphone, Plus, Target, Calendar } from "lucide-react";
+import { cn } from "@/lib/utils";
 import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-  ReferenceLine,
-} from "recharts";
-import {
-  Megaphone,
-  TrendingUp,
-  TrendingDown,
-  Users,
-  Clock,
-  ShoppingCart,
-  Plus,
-  Target,
-  Calendar,
-  Eye,
-} from "lucide-react";
+  CAMPAIGN_STATUS_LABELS,
+  CAMPAIGN_TYPES,
+  type Campaign,
+} from "@/lib/campaigns";
+import { CampaignForm } from "./CampaignForm";
+import { CampaignAnalysis } from "./CampaignAnalysis";
 import type { Store } from "@/types";
 
 interface Zone {
@@ -52,300 +31,148 @@ interface Zone {
   color: string;
 }
 
-interface Campaign {
-  id: string;
-  store_id: string;
-  zone_id: string | null;
-  name: string;
-  description: string | null;
-  campaign_type: string;
-  start_date: string;
-  end_date: string;
-  baseline_start: string;
-  baseline_end: string;
-  status: string;
-  zones: Zone | null;
-}
-
 interface CampaignViewProps {
   store: Store;
+  /** Campañas con el estado que corresponde a sus fechas. */
   campaigns: Campaign[];
   zones: Zone[];
+  /** Puede crear, editar y dar de baja campañas (HU-17). */
+  canManage: boolean;
 }
 
-const typeLabels: Record<string, string> = {
-  promo: "Promoción",
-  endcap: "Cabecera",
-  island: "Isla",
-  seasonal: "Estacional",
-  layout_change: "Cambio Layout",
-  other: "Otro",
-};
-
-const statusColors: Record<string, string> = {
+const STATUS_VARIANTS: Record<string, "default" | "secondary" | "outline" | "destructive"> = {
   planned: "secondary",
   active: "default",
   completed: "outline",
   cancelled: "destructive",
 };
 
-function ChangeIndicator({ value, label }: { value: number | null; label: string }) {
-  if (value === null) return null;
-  const positive = value > 0;
-  const Icon = positive ? TrendingUp : TrendingDown;
-  return (
-    <div className="flex items-center justify-between text-sm">
-      <span className="text-muted-foreground">{label}</span>
-      <span className={`flex items-center gap-1 font-medium ${positive ? "text-emerald-500" : "text-red-500"}`}>
-        <Icon className="h-3.5 w-3.5" />
-        {positive ? "+" : ""}{value}%
-      </span>
-    </div>
-  );
-}
+const shortDate = (date: string) => `${date.slice(8, 10)}/${date.slice(5, 7)}`;
 
-function CampaignDetail({ campaignId }: { campaignId: string }) {
-  const [data, setData] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    fetch(`/api/campaigns/${campaignId}`)
-      .then((r) => r.json())
-      .then(setData)
-      .finally(() => setLoading(false));
-  }, [campaignId]);
-
-  if (loading) return <div className="py-8 text-center text-muted-foreground">Cargando...</div>;
-  if (!data?.campaign) return <div className="py-8 text-center text-muted-foreground">Error al cargar</div>;
-
-  const { campaign, baseline, campaign_metrics, changes, daily_data } = data;
-
-  const chartData = (daily_data || []).map((d: any) => ({
-    date: new Date(`${d.date}T12:00:00`).toLocaleDateString("es", { day: "2-digit", month: "short" }),
-    visitantes: d.total_visitors || 0,
-    transacciones: d.total_transactions || 0,
-    isCampaign: d.date >= campaign.start_date && d.date <= campaign.end_date,
-  }));
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-lg border p-3 space-y-2">
-          <p className="text-xs font-medium text-muted-foreground">Baseline</p>
-          <p className="text-lg font-bold">{baseline?.avg_daily_visitors?.toFixed(0) || 0}</p>
-          <p className="text-xs text-muted-foreground">visitantes/día</p>
-        </div>
-        <div className="rounded-lg border p-3 space-y-2">
-          <p className="text-xs font-medium text-muted-foreground">Campaña</p>
-          <p className="text-lg font-bold">{campaign_metrics?.avg_daily_visitors?.toFixed(0) || 0}</p>
-          <p className="text-xs text-muted-foreground">visitantes/día</p>
-        </div>
-      </div>
-
-      <div className="rounded-lg border p-3 space-y-2">
-        <p className="text-xs font-medium text-muted-foreground mb-2">Cambios vs Baseline</p>
-        <ChangeIndicator value={changes.visitors} label="Visitantes/día" />
-        <ChangeIndicator value={changes.zone_visits} label="Visitas zona" />
-        <ChangeIndicator value={changes.dwell_time} label="Dwell time" />
-        <ChangeIndicator value={changes.engagement} label="Engagement" />
-        <ChangeIndicator value={changes.transactions} label="Transacciones" />
-        <ChangeIndicator value={changes.conversion} label="Conversión" />
-      </div>
-
-      {chartData.length > 0 && (
-        <div>
-          <p className="text-xs font-medium text-muted-foreground mb-2">Visitantes por Día</p>
-          <ResponsiveContainer width="100%" height={200}>
-            <BarChart data={chartData}>
-              <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-              <XAxis dataKey="date" tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
-              <YAxis tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }} />
-              <Tooltip
-                contentStyle={{
-                  backgroundColor: "hsl(var(--card))",
-                  border: "1px solid hsl(var(--border))",
-                  borderRadius: "var(--radius)",
-                  color: "hsl(var(--foreground))",
-                  fontSize: 12,
-                }}
-              />
-              <Bar
-                dataKey="visitantes"
-                fill="hsl(var(--primary))"
-                radius={[2, 2, 0, 0]}
-                name="Visitantes"
-              />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-    </div>
-  );
-}
-
-export function CampaignView({ store, campaigns: initialCampaigns, zones }: CampaignViewProps) {
+export function CampaignView({ store, campaigns: initialCampaigns, zones, canManage }: CampaignViewProps) {
   const [campaigns, setCampaigns] = useState(initialCampaigns);
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [creating, setCreating] = useState(false);
-  const [form, setForm] = useState({
-    name: "",
-    description: "",
-    campaign_type: "promo",
-    zone_id: "",
-    start_date: "",
-    end_date: "",
-    baseline_start: "",
-    baseline_end: "",
-  });
+  // Arranca mostrando la efectividad de la última campaña finalizada
+  const [selectedId, setSelectedId] = useState<string | null>(
+    () => (initialCampaigns.find((c) => c.status === "completed") ?? initialCampaigns[0])?.id ?? null
+  );
+  const [formOpen, setFormOpen] = useState(false);
+  const [editing, setEditing] = useState<Campaign | null>(null);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
-  const handleCreate = async () => {
-    setCreating(true);
+  const selected = campaigns.find((c) => c.id === selectedId) ?? null;
+
+  const upsert = (campaign: Campaign) => {
+    setCampaigns((list) => {
+      const exists = list.some((c) => c.id === campaign.id);
+      const next = exists ? list.map((c) => (c.id === campaign.id ? campaign : c)) : [campaign, ...list];
+      return next.sort((a, b) => b.start_date.localeCompare(a.start_date));
+    });
+    setSelectedId(campaign.id);
+    setRefreshKey((k) => k + 1);
+  };
+
+  const openCreate = () => {
+    setEditing(null);
+    setFormOpen(true);
+  };
+
+  const openEdit = () => {
+    if (!selected) return;
+    setEditing(selected);
+    setFormOpen(true);
+  };
+
+  const setCancelled = async (cancelled: boolean) => {
+    if (!selected) return;
+    setBusy(true);
     try {
-      const res = await fetch("/api/campaigns", {
-        method: "POST",
+      const res = await fetch(`/api/campaigns/${selected.id}`, {
+        method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...form,
-          store_id: store.id,
-          zone_id: form.zone_id || null,
-        }),
+        body: JSON.stringify({ cancelled }),
       });
       const data = await res.json();
-      if (data.campaign) {
-        setCampaigns([data.campaign, ...campaigns]);
-        setDialogOpen(false);
-        setForm({ name: "", description: "", campaign_type: "promo", zone_id: "", start_date: "", end_date: "", baseline_start: "", baseline_end: "" });
-      }
+      if (!res.ok) throw new Error(data.error || "No se pudo actualizar la campaña");
+      upsert(data.campaign);
+      toast.success(cancelled ? "Campaña dada de baja" : "Campaña reactivada");
+      setConfirmCancel(false);
+    } catch (err: any) {
+      toast.error(err.message);
     } finally {
-      setCreating(false);
+      setBusy(false);
     }
   };
 
-  const activeCampaigns = campaigns.filter((c) => c.status === "active").length;
-  const completedCampaigns = campaigns.filter((c) => c.status === "completed").length;
+  const activeCount = campaigns.filter((c) => c.status === "active").length;
+  const completedCount = campaigns.filter((c) => c.status === "completed").length;
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-3">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Promociones</h1>
           <p className="mt-1 text-muted-foreground">{store.name}</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button><Plus className="mr-2 h-4 w-4" /> Nueva Campaña</Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Crear Campaña</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label>Nombre</Label>
-                <Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Ej: Promo Verano 2026" />
-              </div>
-              <div>
-                <Label>Descripción</Label>
-                <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="Descripción opcional" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Tipo</Label>
-                  <Select value={form.campaign_type} onValueChange={(v) => setForm({ ...form, campaign_type: v })}>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(typeLabels).map(([k, v]) => (
-                        <SelectItem key={k} value={k}>{v}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label>Zona (opcional)</Label>
-                  <Select value={form.zone_id} onValueChange={(v) => setForm({ ...form, zone_id: v })}>
-                    <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
-                    <SelectContent>
-                      {zones.map((z) => (
-                        <SelectItem key={z.id} value={z.id}>{z.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Inicio Campaña</Label>
-                  <Input type="date" value={form.start_date} onChange={(e) => setForm({ ...form, start_date: e.target.value })} />
-                </div>
-                <div>
-                  <Label>Fin Campaña</Label>
-                  <Input type="date" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} />
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <Label>Inicio Baseline</Label>
-                  <Input type="date" value={form.baseline_start} onChange={(e) => setForm({ ...form, baseline_start: e.target.value })} />
-                </div>
-                <div>
-                  <Label>Fin Baseline</Label>
-                  <Input type="date" value={form.baseline_end} onChange={(e) => setForm({ ...form, baseline_end: e.target.value })} />
-                </div>
-              </div>
-              <Button onClick={handleCreate} disabled={creating || !form.name || !form.start_date || !form.end_date || !form.baseline_start || !form.baseline_end} className="w-full">
-                {creating ? "Creando..." : "Crear Campaña"}
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+        {canManage && (
+          <Button onClick={openCreate}>
+            <Plus className="mr-2 h-4 w-4" /> Nueva campaña
+          </Button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-        <MetricCard title="Total Campañas" value={campaigns.length} icon={Megaphone} />
-        <MetricCard title="Activas" value={activeCampaigns} icon={Target} changeType={activeCampaigns > 0 ? "positive" : "neutral"} />
-        <MetricCard title="Completadas" value={completedCampaigns} icon={Calendar} />
+        <MetricCard title="Campañas" value={campaigns.length} icon={Megaphone} />
+        <MetricCard
+          title="Activas"
+          value={activeCount}
+          icon={Target}
+          changeType={activeCount > 0 ? "positive" : "neutral"}
+        />
+        <MetricCard title="Finalizadas" value={completedCount} icon={Calendar} />
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* Campaign List */}
-        <Card>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-5">
+        <Card className="xl:col-span-2">
           <CardHeader>
             <CardTitle>Campañas</CardTitle>
           </CardHeader>
           <CardContent>
             {campaigns.length === 0 ? (
               <div className="py-8 text-center text-muted-foreground">
-                <Megaphone className="mx-auto h-8 w-8 mb-2 opacity-50" />
-                <p>Sin campañas aún</p>
-                <p className="text-sm">Crea una para medir su impacto</p>
+                <Megaphone className="mx-auto mb-2 h-8 w-8 opacity-50" />
+                <p>Todavía no hay campañas</p>
+                {canManage && <p className="text-sm">Creá una para medir su impacto</p>}
               </div>
             ) : (
               <div className="space-y-2">
                 {campaigns.map((c) => (
                   <button
                     key={c.id}
-                    onClick={() => setSelectedId(c.id === selectedId ? null : c.id)}
-                    className={`w-full text-left rounded-lg border p-3 transition-colors hover:bg-accent/50 ${
-                      c.id === selectedId ? "border-primary bg-accent/30" : "border-border"
-                    }`}
+                    onClick={() => setSelectedId(c.id)}
+                    className={cn(
+                      "w-full rounded-lg border p-3 text-left transition-colors hover:bg-accent/50",
+                      c.id === selectedId ? "border-primary bg-accent/30" : "border-border",
+                      c.status === "cancelled" && "opacity-70"
+                    )}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium truncate">{c.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {typeLabels[c.campaign_type] || c.campaign_type}
-                          {c.zones ? ` · ${c.zones.name}` : ""}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="truncate font-medium">{c.name}</p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {CAMPAIGN_TYPES[c.campaign_type as keyof typeof CAMPAIGN_TYPES] ?? c.campaign_type}
+                          {" · "}
+                          {c.zones?.name ?? "Toda la tienda"}
+                          {c.product_category && ` · ${c.product_category}`}
+                        </p>
+                        <p className="mt-1 text-xs tabular-nums text-muted-foreground">
+                          {shortDate(c.start_date)} al {shortDate(c.end_date)}/{c.end_date.slice(0, 4)}
                         </p>
                       </div>
-                      <div className="flex items-center gap-2 ml-2">
-                        <span className="text-xs text-muted-foreground">
-                          {c.start_date} → {c.end_date}
-                        </span>
-                        <Badge variant={statusColors[c.status] as any}>
-                          {c.status}
-                        </Badge>
-                      </div>
+                      <Badge variant={STATUS_VARIANTS[c.status]} className="shrink-0">
+                        {CAMPAIGN_STATUS_LABELS[c.status]}
+                      </Badge>
                     </div>
                   </button>
                 ))}
@@ -354,26 +181,59 @@ export function CampaignView({ store, campaigns: initialCampaigns, zones }: Camp
           </CardContent>
         </Card>
 
-        {/* Campaign Detail */}
-        <Card>
+        <Card className="xl:col-span-3">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Eye className="h-5 w-5" />
-              {selectedId ? "Resultados" : "Selecciona una campaña"}
-            </CardTitle>
+            <CardTitle>Efectividad</CardTitle>
           </CardHeader>
           <CardContent>
-            {selectedId ? (
-              <CampaignDetail campaignId={selectedId} />
+            {selected ? (
+              <CampaignAnalysis
+                campaignId={selected.id}
+                refreshKey={refreshKey}
+                canManage={canManage}
+                onEdit={openEdit}
+                onCancel={() => setConfirmCancel(true)}
+                onReactivate={() => setCancelled(false)}
+              />
             ) : (
               <div className="py-12 text-center text-muted-foreground">
-                <Target className="mx-auto h-8 w-8 mb-2 opacity-50" />
-                <p>Selecciona una campaña para ver sus métricas comparativas</p>
+                <Target className="mx-auto mb-2 h-8 w-8 opacity-50" />
+                <p>Elegí una campaña para ver su impacto antes, durante y después</p>
               </div>
             )}
           </CardContent>
         </Card>
       </div>
+
+      {canManage && (
+        <CampaignForm
+          open={formOpen}
+          onOpenChange={setFormOpen}
+          storeId={store.id}
+          zones={zones}
+          campaign={editing}
+          onSaved={upsert}
+        />
+      )}
+
+      <Dialog open={confirmCancel} onOpenChange={setConfirmCancel}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Dar de baja la campaña</DialogTitle>
+            <DialogDescription>
+              {selected?.name} queda como dada de baja. Sus métricas se conservan y se puede reactivar.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmCancel(false)} disabled={busy}>
+              Volver
+            </Button>
+            <Button variant="destructive" onClick={() => setCancelled(true)} disabled={busy}>
+              {busy ? "Dando de baja…" : "Dar de baja"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
