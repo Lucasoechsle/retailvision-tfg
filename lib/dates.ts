@@ -28,6 +28,33 @@ export function localHour(instant: Date, timeZone: string): number {
   );
 }
 
+function storeParts(instant: string | Date, timeZone: string): Record<string, string> {
+  return Object.fromEntries(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone,
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    })
+      .formatToParts(new Date(instant))
+      .map((p) => [p.type, p.value])
+  );
+}
+
+/** "DD/MM HH:MM" de un instante en la zona de la tienda (igual en el servidor y en el navegador). */
+export function formatStoreDateTime(instant: string | Date, timeZone: string): string {
+  const p = storeParts(instant, timeZone);
+  return `${p.day}/${p.month} ${p.hour}:${p.minute}`;
+}
+
+/** "HH:MM" de un instante en la zona de la tienda. */
+export function formatStoreTime(instant: string | Date, timeZone: string): string {
+  const p = storeParts(instant, timeZone);
+  return `${p.hour}:${p.minute}`;
+}
+
 /** Día de la semana (0 = domingo) de una fecha AAAA-MM-DD. */
 export function weekday(date: string): number {
   return new Date(`${date}T12:00:00Z`).getUTCDay();

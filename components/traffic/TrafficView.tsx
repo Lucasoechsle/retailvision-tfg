@@ -19,7 +19,7 @@ import {
   YAxis,
 } from "recharts";
 import { changeProps, variation } from "@/lib/compare";
-import { addDays, daysInclusive, storeTimeZone } from "@/lib/dates";
+import { addDays, daysInclusive, formatStoreDateTime, storeTimeZone } from "@/lib/dates";
 import type { Store, PeopleCount } from "@/types";
 
 interface PeriodSummary {
@@ -78,23 +78,6 @@ const shortDate = (date: string) => `${date.slice(8, 10)}/${date.slice(5, 7)}`;
 const dayLabel = (date: string) => `${WEEKDAYS[new Date(`${date}T12:00:00Z`).getUTCDay()]} ${shortDate(date)}`;
 const hourRange = (hour: number) => `${pad(hour)}:00 a ${pad(hour + 1)}:00`;
 const count = (value: number) => value.toLocaleString("es-AR");
-
-/** Día y hora de un instante en la zona de la tienda (igual en el servidor y en el navegador). */
-function storeTime(instant: string, timeZone: string): string {
-  const parts = Object.fromEntries(
-    new Intl.DateTimeFormat("en-GB", {
-      timeZone,
-      day: "2-digit",
-      month: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      hourCycle: "h23",
-    })
-      .formatToParts(new Date(instant))
-      .map((p) => [p.type, p.value])
-  );
-  return `${parts.day}/${parts.month} ${parts.hour}:${parts.minute}`;
-}
 
 function periodLabel(period: { from: string; to: string }): string {
   return period.from === period.to ? dayLabel(period.from) : `${dayLabel(period.from)} al ${dayLabel(period.to)}`;
@@ -300,7 +283,7 @@ export function TrafficView({ store, today, latest }: TrafficViewProps) {
           icon={UserCheck}
           description={
             latest
-              ? `último registro: ${storeTime(latest.timestamp, storeTimeZone(store))}`
+              ? `último registro: ${formatStoreDateTime(latest.timestamp, storeTimeZone(store))}`
               : "sin registros"
           }
         />

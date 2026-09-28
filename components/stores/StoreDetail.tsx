@@ -8,7 +8,6 @@ import {
   Clock,
   Camera,
   MapPin,
-  Activity,
   Map,
   ArrowUpRight,
   Settings,
@@ -23,8 +22,11 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import Link from "next/link";
-import { canAccessStoreModule, type Role } from "@/lib/auth/roles";
+import { can, canAccessStoreModule, type Role } from "@/lib/auth/roles";
 import { STORE_MODULE_LINKS } from "@/components/stores/storeModules";
+import { OccupancyPanel } from "@/components/stores/OccupancyPanel";
+import { storeTimeZone } from "@/lib/dates";
+import type { StoreOccupancy } from "@/lib/occupancy";
 import type { Store, Device, Zone, HourlyTraffic } from "@/types";
 
 interface StoreDetailProps {
@@ -33,7 +35,9 @@ interface StoreDetailProps {
   devices: Device[];
   zones: Zone[];
   hourlyTraffic: HourlyTraffic[];
-  currentInside: number;
+  occupancy: StoreOccupancy;
+  /** Momento en que el servidor calculó la ocupación (ISO). */
+  occupancyFetchedAt: string;
   avgDwellSeconds?: number;
 }
 
@@ -51,7 +55,8 @@ export function StoreDetail({
   devices,
   zones,
   hourlyTraffic,
-  currentInside,
+  occupancy,
+  occupancyFetchedAt,
   avgDwellSeconds = 0,
 }: StoreDetailProps) {
   const devicesOnline = devices.filter((d) => d.status === "online").length;
@@ -105,14 +110,15 @@ export function StoreDetail({
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <MetricCard
-          title="En Tienda Ahora"
-          value={currentInside}
-          icon={Activity}
-          changeType={currentInside > 0 ? "positive" : "neutral"}
-          change={currentInside > 0 ? "live" : undefined}
-        />
+      <OccupancyPanel
+        storeId={store.id}
+        timeZone={storeTimeZone(store)}
+        initial={occupancy}
+        fetchedAt={occupancyFetchedAt}
+        canManageRules={can(role, "manage_alert_rules")}
+      />
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <MetricCard
           title="Zonas Definidas"
           value={zones.length}

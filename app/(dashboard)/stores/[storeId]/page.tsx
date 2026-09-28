@@ -2,7 +2,8 @@ import { getStoreById } from "@/lib/data/stores";
 import { guardStoreModule } from "@/lib/auth/guards";
 import { getDevicesByStore } from "@/lib/data/devices";
 import { getZonesByStore } from "@/lib/data/zones";
-import { getHourlyTraffic, getRecentCounts } from "@/lib/data/analytics";
+import { getHourlyTraffic } from "@/lib/data/analytics";
+import { getStoreOccupancy } from "@/lib/data/occupancy";
 import { createClient } from "@/lib/supabase/server";
 import { storeTimeZone } from "@/lib/dates";
 import { StoreDetail } from "@/components/stores/StoreDetail";
@@ -28,18 +29,18 @@ export default async function StoreDetailPage({
 
   const supabase = createClient();
 
-  const [devices, zones, hourlyTraffic, recentCounts, dwellRes] = await Promise.all([
+  const timeZone = storeTimeZone(store);
+  const occupancyFetchedAt = new Date().toISOString();
+  const [devices, zones, hourlyTraffic, occupancy, dwellRes] = await Promise.all([
     getDevicesByStore(params.storeId),
     getZonesByStore(params.storeId),
-    getHourlyTraffic(params.storeId, 7, storeTimeZone(store)),
-    getRecentCounts(params.storeId, 1),
+    getHourlyTraffic(params.storeId, 7, timeZone),
+    getStoreOccupancy(params.storeId, timeZone),
     supabase
       .from("daily_zone_summaries")
       .select("avg_dwell_seconds")
       .eq("store_id", params.storeId),
   ]);
-
-  const currentInside = recentCounts[0]?.current_inside || 0;
 
   // Dwell time promedio real a partir de los resúmenes diarios por zona
   const dwellVals = (dwellRes.data || [])
@@ -56,7 +57,8 @@ export default async function StoreDetailPage({
       devices={devices}
       zones={zones}
       hourlyTraffic={hourlyTraffic}
-      currentInside={currentInside}
+      occupancy={occupancy}
+      occupancyFetchedAt={occupancyFetchedAt}
       avgDwellSeconds={avgDwellSeconds}
     />
   );

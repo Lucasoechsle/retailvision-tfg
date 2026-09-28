@@ -1,4 +1,5 @@
 import { SupabaseClient } from "@supabase/supabase-js";
+import { occupancyThreshold, queueThreshold } from "./present";
 
 interface AlertRule {
   id: string;
@@ -52,7 +53,7 @@ export async function evaluateAlerts(
 function affectedZoneId(rule: AlertRule, context: AlertContext): string | null {
   if (rule.rule_type === "zone_empty") return rule.config.zone_id ?? null;
   if (rule.rule_type === "queue_length") {
-    const threshold = rule.config.max_people || 5;
+    const threshold = queueThreshold(rule.config);
     const worst = (context.data.queues || [])
       .filter((q: any) => q.people_in_queue > threshold)
       .sort((a: any, b: any) => b.people_in_queue - a.people_in_queue)[0];
@@ -83,14 +84,14 @@ async function checkRule(rule: AlertRule, context: AlertContext): Promise<boolea
   switch (rule.rule_type) {
     case "queue_length": {
       if (context.type !== "queues") return false;
-      const threshold = config.max_people || 5;
+      const threshold = queueThreshold(config);
       const queues = context.data.queues || [];
       return queues.some((q: any) => q.people_in_queue > threshold);
     }
 
     case "occupancy": {
       if (context.type !== "counts") return false;
-      const maxOccupancy = config.max_occupancy || 100;
+      const maxOccupancy = occupancyThreshold(config);
       return (context.data.current_inside || 0) > maxOccupancy;
     }
 

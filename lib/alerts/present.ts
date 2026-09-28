@@ -30,8 +30,8 @@ type Data = Record<string, any> | null | undefined;
 type Config = Record<string, any> | null | undefined;
 
 // Los umbrales se guardan con dos convenciones de nombres (reglas del dashboard y datos de demo)
-const queueThreshold = (cfg: Config) => Number(cfg?.max_people ?? cfg?.threshold_people ?? 5);
-const occupancyThreshold = (cfg: Config) => Number(cfg?.max_occupancy ?? cfg?.threshold_inside ?? 100);
+export const queueThreshold = (cfg: Config) => Number(cfg?.max_people ?? cfg?.threshold_people ?? 5);
+export const occupancyThreshold = (cfg: Config) => Number(cfg?.max_occupancy ?? cfg?.threshold_inside ?? 100);
 
 /** Cola más larga de las que disparó la alerta (formato del motor: data.values.queues). */
 function worstQueue(data: Data): Record<string, any> | null {
