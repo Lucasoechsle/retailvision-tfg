@@ -116,8 +116,11 @@ La base de datos se crea ejecutando en el SQL Editor de Supabase, en este orden:
 5. `migration_baja_dispositivos.sql` — baja lógica de dispositivos de borde.
 6. `migration_conversion.sql` — tasa de conversión diaria calculada desde los conteos y las transacciones.
 7. `migration_resumenes_diarios.sql` — tarea programada que recalcula los resúmenes diarios cada 5 minutos.
+8. `migration_trafico.sql` — entradas y salidas por día y franja horaria, en la zona horaria de la tienda.
 
 Para crear los usuarios de demostración de cada perfil: `node scripts/seed-demo-roles.mjs`.
+
+`seed_historial_demo.sql` (una sola vez) genera 9 semanas de historial antes de la semana de demostración, para que las comparaciones con la semana o el período anterior tengan datos.
 
 Antes de una demo, `refresh_demo_dates.sql` mueve los datos de demostración para que su último día sea hoy.
 

@@ -64,9 +64,10 @@ BEGIN
    WHERE triggered_at < v_cut;
 
   -- Resúmenes diarios: se recalculan desde los datos de origen ya movidos
+  -- (70 días: la semana de demo y las 9 de seed_historial_demo.sql)
   DELETE FROM daily_store_summaries;
   DELETE FROM daily_zone_summaries;
-  PERFORM public.refresh_daily_summaries(60);
+  PERFORM public.refresh_daily_summaries(70);
 
   RAISE NOTICE 'OK: datos de demo movidos % días hacia adelante.', v_days;
 END $$;

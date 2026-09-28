@@ -1,40 +1,223 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useEffect, useState } from "react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { MetricCard } from "@/components/dashboard/MetricCard";
-import { Users, ArrowUpRight, ArrowDownRight, UserCheck } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, Clock, UserCheck, Users } from "lucide-react";
 import {
-  AreaChart,
-  Area,
+  Bar,
+  CartesianGrid,
+  ComposedChart,
+  Legend,
+  Line,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
 } from "recharts";
+import { changeProps, variation } from "@/lib/compare";
+import { addDays, daysInclusive } from "@/lib/dates";
 import type { Store, PeopleCount } from "@/types";
+
+interface PeriodSummary {
+  from: string;
+  to: string;
+  entries: number;
+  exits: number;
+  peak_hour: { hour: number; entries: number } | null;
+  busiest_day: { day: string; entries: number } | null;
+}
+
+interface TrafficData {
+  current: PeriodSummary;
+  previous: PeriodSummary;
+  shift_days: number;
+  hourly: { hour: number; entries: number; exits: number; previous_entries: number; previous_exits: number }[];
+  daily: {
+    day: string;
+    previous_day: string;
+    entries: number;
+    exits: number;
+    previous_entries: number;
+    previous_exits: number;
+  }[];
+}
+
+interface ChartRow {
+  label: string;
+  tooltipLabel: string;
+  entries: number;
+  exits: number;
+  prevEntries: number;
+  prevExits: number;
+}
 
 interface TrafficViewProps {
   store: Store;
-  counts: PeopleCount[];
+  /** Fecha de hoy en la zona horaria de la tienda (AAAA-MM-DD). */
+  today: string;
+  /** Último registro de conteo, para la ocupación actual. */
+  latest: PeopleCount | null;
 }
 
-export function TrafficView({ store, counts }: TrafficViewProps) {
-  const totalEntries = counts.reduce((sum, c) => sum + c.entries, 0);
-  const totalExits = counts.reduce((sum, c) => sum + c.exits, 0);
-  const currentInside = counts.length > 0 ? counts[0].current_inside : 0;
+const PRESETS = [
+  { label: "Hoy", days: 1 },
+  { label: "7 días", days: 7 },
+  { label: "30 días", days: 30 },
+];
 
-  const chartData = [...counts]
-    .reverse()
-    .map((c) => ({
-      time: new Date(c.timestamp).toLocaleTimeString("es", {
-        hour: "2-digit",
-        minute: "2-digit",
-      }),
-      entries: c.entries,
-      exits: c.exits,
-      inside: c.current_inside,
-    }));
+const ENTRIES_COLOR = "hsl(var(--primary))";
+const EXITS_COLOR = "hsl(0 84.2% 60.2%)";
+const WEEKDAYS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
+
+const pad = (n: number) => String(n).padStart(2, "0");
+const shortDate = (date: string) => `${date.slice(8, 10)}/${date.slice(5, 7)}`;
+const dayLabel = (date: string) => `${WEEKDAYS[new Date(`${date}T12:00:00Z`).getUTCDay()]} ${shortDate(date)}`;
+const hourRange = (hour: number) => `${pad(hour)}:00 a ${pad(hour + 1)}:00`;
+const count = (value: number) => value.toLocaleString("es-AR");
+
+/** Día y hora de un instante en la zona de la tienda (igual en el servidor y en el navegador). */
+function storeTime(instant: string, timeZone: string): string {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-GB", {
+      timeZone,
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    })
+      .formatToParts(new Date(instant))
+      .map((p) => [p.type, p.value])
+  );
+  return `${parts.day}/${parts.month} ${parts.hour}:${parts.minute}`;
+}
+
+function periodLabel(period: { from: string; to: string }): string {
+  return period.from === period.to ? dayLabel(period.from) : `${dayLabel(period.from)} al ${dayLabel(period.to)}`;
+}
+
+function TrafficChart({ data, compareName }: { data: ChartRow[]; compareName: string }) {
+  return (
+    <ResponsiveContainer width="100%" height={320}>
+      <ComposedChart data={data}>
+        <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+        <XAxis dataKey="label" tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+        <YAxis allowDecimals={false} tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 12 }} />
+        <Tooltip
+          contentStyle={{
+            backgroundColor: "hsl(var(--card))",
+            border: "1px solid hsl(var(--border))",
+            borderRadius: "var(--radius)",
+            color: "hsl(var(--foreground))",
+          }}
+          labelFormatter={(label, payload) => payload?.[0]?.payload?.tooltipLabel ?? label}
+          formatter={(value, name) => [count(Number(value ?? 0)), name]}
+        />
+        <Legend />
+        <Bar dataKey="entries" name="Entradas" fill={ENTRIES_COLOR} opacity={0.75} radius={[4, 4, 0, 0]} />
+        <Bar dataKey="exits" name="Salidas" fill={EXITS_COLOR} opacity={0.6} radius={[4, 4, 0, 0]} />
+        <Line
+          type="monotone"
+          dataKey="prevEntries"
+          name={`Entradas ${compareName}`}
+          stroke={ENTRIES_COLOR}
+          strokeWidth={2}
+          strokeDasharray="6 4"
+          dot={false}
+        />
+        <Line
+          type="monotone"
+          dataKey="prevExits"
+          name={`Salidas ${compareName}`}
+          stroke={EXITS_COLOR}
+          strokeWidth={2}
+          strokeDasharray="6 4"
+          dot={false}
+        />
+      </ComposedChart>
+    </ResponsiveContainer>
+  );
+}
+
+/**
+ * HU-10: entradas y salidas por franja horaria y por día del período elegido (hoy,
+ * 7 días, 30 días o personalizado), comparadas con el mismo período de la semana anterior.
+ */
+export function TrafficView({ store, today, latest }: TrafficViewProps) {
+  const [range, setRange] = useState({ from: addDays(today, -6), to: today });
+  const [data, setData] = useState<TrafficData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!range.from || !range.to || range.from > range.to) return;
+    let cancelled = false;
+    setLoading(true);
+    setError(null);
+    fetch(`/api/analytics/${store.id}/traffic?from=${range.from}&to=${range.to}`)
+      .then(async (res) => {
+        const body = await res.json();
+        if (!res.ok) throw new Error(body.error || "No se pudo calcular el tráfico");
+        return body;
+      })
+      .then((body) => !cancelled && setData(body))
+      .catch((err) => !cancelled && setError(err.message))
+      .finally(() => !cancelled && setLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [store.id, range]);
+
+  const length = daysInclusive(range.from, range.to);
+  const activePreset = range.to === today ? PRESETS.find((p) => p.days === length)?.days : undefined;
+
+  const current = data?.current;
+  const previous = data?.previous;
+  const shift = data?.shift_days ?? 7;
+  // Nombre de la serie comparada y la misma referencia dentro de una frase
+  const compareName = shift === 7 ? "semana anterior" : `${shift / 7} semanas antes`;
+  const comparePhrase = shift === 7 ? "la semana anterior" : compareName;
+  const hasPrevious = !!previous && previous.entries + previous.exits > 0;
+  const compareText = hasPrevious ? `vs ${comparePhrase}` : `sin datos de ${comparePhrase}`;
+
+  // Solo las horas con registros en alguno de los dos períodos
+  const hours = (data?.hourly || []).filter(
+    (h) => h.entries + h.exits + h.previous_entries + h.previous_exits > 0
+  );
+  const noData = !!data && hours.length === 0;
+  const hourlyChart: ChartRow[] =
+    data && hours.length > 0
+      ? data.hourly.slice(hours[0].hour, hours[hours.length - 1].hour + 1).map((h) => ({
+          label: `${pad(h.hour)} h`,
+          tooltipLabel: hourRange(h.hour),
+          entries: h.entries,
+          exits: h.exits,
+          prevEntries: h.previous_entries,
+          prevExits: h.previous_exits,
+        }))
+      : [];
+  const dailyChart: ChartRow[] = (data?.daily || []).map((d) => ({
+    label: length > 14 ? shortDate(d.day) : dayLabel(d.day),
+    tooltipLabel: `${dayLabel(d.day)} (vs ${dayLabel(d.previous_day)})`,
+    entries: d.entries,
+    exits: d.exits,
+    prevEntries: d.previous_entries,
+    prevExits: d.previous_exits,
+  }));
+
+  const empty = (
+    <div className="flex h-64 items-center justify-center text-muted-foreground">
+      <div className="text-center">
+        <Users className="mx-auto mb-2 h-8 w-8 opacity-50" />
+        <p>Sin datos de tráfico en este período ni en el de comparación</p>
+        <p className="text-sm">Probá con otras fechas o revisá que los dispositivos estén enviando conteos</p>
+      </div>
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -43,72 +226,113 @@ export function TrafficView({ store, counts }: TrafficViewProps) {
         <p className="mt-1 text-muted-foreground">{store.name}</p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="flex flex-wrap items-end gap-3">
+        <div className="flex gap-1.5">
+          {PRESETS.map((preset) => (
+            <Button
+              key={preset.days}
+              variant={activePreset === preset.days ? "default" : "outline"}
+              size="sm"
+              onClick={() => setRange({ from: addDays(today, -(preset.days - 1)), to: today })}
+            >
+              {preset.label}
+            </Button>
+          ))}
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="traffic-from" className="text-xs">Desde</Label>
+          <Input
+            id="traffic-from"
+            type="date"
+            value={range.from}
+            max={range.to}
+            onChange={(e) => e.target.value && setRange({ ...range, from: e.target.value })}
+            className="w-40"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="traffic-to" className="text-xs">Hasta</Label>
+          <Input
+            id="traffic-to"
+            type="date"
+            value={range.to}
+            min={range.from}
+            onChange={(e) => e.target.value && setRange({ ...range, to: e.target.value })}
+            className="w-40"
+          />
+        </div>
+        {loading && <span className="text-sm text-muted-foreground">Calculando…</span>}
+      </div>
+
+      {error && <p className="text-sm text-destructive">{error}</p>}
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
-          title="Entradas Hoy"
-          value={totalEntries}
+          title="Entradas"
+          value={current ? count(current.entries) : "--"}
           icon={ArrowUpRight}
-          changeType="positive"
+          description={current ? compareText : undefined}
+          {...changeProps(variation(current?.entries ?? null, previous?.entries ?? null), "%")}
         />
         <MetricCard
-          title="Salidas Hoy"
-          value={totalExits}
+          title="Salidas"
+          value={current ? count(current.exits) : "--"}
           icon={ArrowDownRight}
-          changeType="neutral"
+          description={current ? compareText : undefined}
+          {...changeProps(variation(current?.exits ?? null, previous?.exits ?? null), "%")}
+        />
+        <MetricCard
+          title="Hora Pico"
+          value={current?.peak_hour ? `${pad(current.peak_hour.hour)} h` : "--"}
+          icon={Clock}
+          description={
+            current?.peak_hour
+              ? `${hourRange(current.peak_hour.hour)}, ${count(current.peak_hour.entries)} entradas` +
+                (previous?.peak_hour ? ` (${compareName}: ${pad(previous.peak_hour.hour)} h)` : "")
+              : current
+                ? "sin entradas en el período"
+                : undefined
+          }
         />
         <MetricCard
           title="En Tienda Ahora"
-          value={currentInside}
+          value={latest ? count(latest.current_inside) : "--"}
           icon={UserCheck}
+          description={
+            latest
+              ? `último registro: ${storeTime(latest.timestamp, store.timezone || "America/Argentina/Cordoba")}`
+              : "sin registros"
+          }
         />
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Tráfico por Período</CardTitle>
+          <CardTitle>Entradas y salidas por hora</CardTitle>
+          <CardDescription>
+            {current && previous
+              ? `Total por franja horaria, ${periodLabel(current)}. En línea punteada, ${comparePhrase} (${periodLabel(previous)}).`
+              : "Total por franja horaria del período."}
+          </CardDescription>
         </CardHeader>
-        <CardContent>
-          {chartData.length === 0 ? (
-            <div className="flex h-64 items-center justify-center text-muted-foreground">
-              <div className="text-center">
-                <Users className="mx-auto h-8 w-8 mb-2 opacity-50" />
-                <p>Sin datos de tráfico</p>
-                <p className="text-sm">Los datos aparecerán cuando los dispositivos envíen información</p>
-              </div>
-            </div>
-          ) : (
-            <ResponsiveContainer width="100%" height={350}>
-              <AreaChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                <XAxis dataKey="time" className="text-xs" tick={{ fill: "hsl(var(--muted-foreground))" }} />
-                <YAxis className="text-xs" tick={{ fill: "hsl(var(--muted-foreground))" }} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "var(--radius)",
-                    color: "hsl(var(--foreground))",
-                  }}
-                />
-                <Area
-                  type="monotone"
-                  dataKey="entries"
-                  stroke="hsl(var(--primary))"
-                  fill="hsl(var(--primary) / 0.1)"
-                  name="Entradas"
-                />
-                <Area
-                  type="monotone"
-                  dataKey="exits"
-                  stroke="hsl(0 84.2% 60.2%)"
-                  fill="hsl(0 84.2% 60.2% / 0.1)"
-                  name="Salidas"
-                />
-              </AreaChart>
-            </ResponsiveContainer>
-          )}
-        </CardContent>
+        <CardContent>{noData ? empty : <TrafficChart data={hourlyChart} compareName={compareName} />}</CardContent>
       </Card>
+
+      {length > 1 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Entradas y salidas por día</CardTitle>
+            <CardDescription>
+              {current?.busiest_day
+                ? `El día con más entradas fue el ${dayLabel(current.busiest_day.day)} (${count(current.busiest_day.entries)}). Cada día se compara con el mismo día de ${comparePhrase}.`
+                : `Cada día se compara con el mismo día de ${comparePhrase}.`}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {noData ? empty : <TrafficChart data={dailyChart} compareName={compareName} />}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

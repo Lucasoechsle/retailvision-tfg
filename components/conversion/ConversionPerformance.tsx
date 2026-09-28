@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MetricCard } from "@/components/dashboard/MetricCard";
 import { DollarSign, ShoppingCart, TrendingUp, Users, Receipt } from "lucide-react";
+import { changeProps, variation } from "@/lib/compare";
 import {
   Bar,
   CartesianGrid,
@@ -50,21 +51,6 @@ const addDays = (date: string, days: number) =>
 
 const shortDate = (date: string) => `${date.slice(8, 10)}/${date.slice(5, 7)}`;
 const money = (value: number) => `$${Math.round(value).toLocaleString("es-AR")}`;
-
-/** Variación porcentual contra el período anterior; null si no hay base de comparación. */
-function variation(current: number | null, previous: number | null): number | null {
-  if (current == null || previous == null || previous === 0) return null;
-  return ((current - previous) / previous) * 100;
-}
-
-function changeProps(delta: number | null, unit: "%" | "pp") {
-  if (delta == null) return { change: undefined, changeType: "neutral" as const };
-  const sign = delta > 0 ? "+" : "";
-  return {
-    change: `${sign}${delta.toFixed(1)}${unit === "pp" ? " pp" : "%"}`,
-    changeType: delta > 0 ? ("positive" as const) : delta < 0 ? ("negative" as const) : ("neutral" as const),
-  };
-}
 
 /** HU-20: tasa de conversión del período, su tendencia diaria y la comparación con el período anterior. */
 export function ConversionPerformance({ storeId, initialRange, refreshKey }: ConversionPerformanceProps) {
