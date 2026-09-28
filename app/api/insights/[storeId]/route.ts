@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { generateStoreInsights } from "@/lib/insights/engine";
 import { authorizeStore } from "@/lib/auth/api";
+import { storeTimeZone } from "@/lib/dates";
 
 export async function GET(
   _request: NextRequest,
@@ -22,7 +23,7 @@ export async function GET(
   if (!store) return NextResponse.json({ error: "Tienda no encontrada" }, { status: 404 });
 
   try {
-    const insights = await generateStoreInsights(params.storeId);
+    const insights = await generateStoreInsights(params.storeId, storeTimeZone(auth.store));
     return NextResponse.json({ insights });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });

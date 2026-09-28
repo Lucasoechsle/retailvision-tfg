@@ -19,7 +19,7 @@ import {
   YAxis,
 } from "recharts";
 import { changeProps, variation } from "@/lib/compare";
-import { addDays, daysInclusive } from "@/lib/dates";
+import { addDays, daysInclusive, storeTimeZone } from "@/lib/dates";
 import type { Store, PeopleCount } from "@/types";
 
 interface PeriodSummary {
@@ -300,7 +300,7 @@ export function TrafficView({ store, today, latest }: TrafficViewProps) {
           icon={UserCheck}
           description={
             latest
-              ? `último registro: ${storeTime(latest.timestamp, store.timezone || "America/Argentina/Cordoba")}`
+              ? `último registro: ${storeTime(latest.timestamp, storeTimeZone(store))}`
               : "sin registros"
           }
         />

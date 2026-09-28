@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { addDays, dayRange, localDate, weekday } from "@/lib/dates";
 
 export interface TrafficPrediction {
   hour: number;
@@ -15,47 +16,44 @@ export interface DailyPrediction {
 }
 
 /**
- * Generates hourly traffic predictions using weighted moving average
- * of the same day-of-week from recent weeks.
+ * Predicción de visitantes por hora para un día de la semana: promedio ponderado de
+ * las entradas de esa hora en ese mismo día de las últimas semanas (las más recientes
+ * pesan más). Horas y días en la zona horaria de la tienda.
  */
 export async function predictHourlyTraffic(
   storeId: string,
-  targetDayOfWeek: number
+  targetDayOfWeek: number,
+  timeZone: string
 ): Promise<TrafficPrediction[]> {
   const supabase = createClient();
 
   const weeksBack = 4;
-  const now = new Date();
-  const startDate = new Date(now);
-  startDate.setDate(startDate.getDate() - weeksBack * 7);
+  const today = localDate(new Date(), timeZone);
+  const range = dayRange(addDays(today, -weeksBack * 7), addDays(today, -1), timeZone);
 
-  const { data: counts } = await supabase
-    .from("people_counts")
-    .select("timestamp, entries")
-    .eq("store_id", storeId)
-    .gte("timestamp", startDate.toISOString())
-    .order("timestamp");
+  // Entradas por día y hora ya agregadas en la base (no hay límite de filas)
+  const { data: rows } = await supabase.rpc("get_traffic_hourly", {
+    p_store_id: storeId,
+    p_from: range.from.toISOString(),
+    p_to: range.to.toISOString(),
+    p_tz: timeZone,
+  });
 
-  if (!counts || counts.length === 0) return [];
-
-  const hourlyByWeek = new Map<number, number[]>();
-
-  for (let h = 0; h < 24; h++) {
-    hourlyByWeek.set(h, []);
-  }
-
-  for (const count of counts) {
-    const d = new Date(count.timestamp);
-    if (d.getDay() !== targetDayOfWeek) continue;
-    const h = d.getHours();
-    hourlyByWeek.get(h)?.push(count.entries || 0);
-  }
+  const days = Array.from(
+    new Set((rows || []).map((r: any) => r.day as string).filter((d: string) => weekday(d) === targetDayOfWeek))
+  ).sort();
+  if (days.length === 0) return [];
 
   const predictions: TrafficPrediction[] = [];
 
   for (let h = 0; h < 24; h++) {
-    const values = hourlyByWeek.get(h) || [];
-    if (values.length === 0) {
+    // Un valor por semana (en orden cronológico): el total de entradas de esa hora
+    const values = days.map((day) =>
+      (rows || [])
+        .filter((r: any) => r.day === day && Number(r.hour) === h)
+        .reduce((sum: number, r: any) => sum + Number(r.entries), 0)
+    );
+    if (values.every((v) => v === 0)) {
       predictions.push({
         hour: h,
         predicted_visitors: 0,
@@ -92,7 +90,9 @@ export async function predictHourlyTraffic(
  */
 export async function predictDailyTraffic(
   storeId: string,
-  daysAhead: number = 7
+  daysAhead: number,
+  /** Fecha de hoy en la tienda (AAAA-MM-DD). */
+  today: string
 ): Promise<DailyPrediction[]> {
   const supabase = createClient();
 
@@ -111,7 +111,7 @@ export async function predictDailyTraffic(
   }
 
   for (const s of summaries) {
-    const dow = new Date(s.date).getDay();
+    const dow = weekday(s.date);
     byDow.get(dow)?.visitors.push(s.total_visitors || 0);
     if (s.conversion_rate != null) byDow.get(dow)?.conv.push(s.conversion_rate);
   }
@@ -126,12 +126,10 @@ export async function predictDailyTraffic(
   const trendFactor = olderAvg > 0 ? recentAvg / olderAvg : 1;
 
   const predictions: DailyPrediction[] = [];
-  const today = new Date();
 
   for (let i = 1; i <= daysAhead; i++) {
-    const targetDate = new Date(today);
-    targetDate.setDate(today.getDate() + i);
-    const dow = targetDate.getDay();
+    const targetDate = addDays(today, i);
+    const dow = weekday(targetDate);
     const dowData = byDow.get(dow)!;
 
     let predicted = 0;
@@ -157,7 +155,7 @@ export async function predictDailyTraffic(
     }
 
     predictions.push({
-      date: targetDate.toISOString().split("T")[0],
+      date: targetDate,
       predicted_visitors: predicted,
       predicted_conversion: predictedConv,
       confidence: parseFloat(confidence.toFixed(2)),

@@ -1,7 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
+import { DEFAULT_TIMEZONE, localHour } from "@/lib/dates";
 import type { HourlyTraffic, DailyStoreSummary, DailyZoneSummary, PeopleCount } from "@/types";
 
-export async function getHourlyTraffic(storeId: string, days: number = 7): Promise<HourlyTraffic[]> {
+export async function getHourlyTraffic(
+  storeId: string,
+  days: number = 7,
+  timeZone: string = DEFAULT_TIMEZONE
+): Promise<HourlyTraffic[]> {
   const supabase = createClient();
   const { data, error } = await supabase.rpc("get_hourly_traffic", {
     p_store_id: storeId,
@@ -23,7 +28,7 @@ export async function getHourlyTraffic(storeId: string, days: number = 7): Promi
 
     const hourMap = new Map<number, { entries: number[]; exits: number[] }>();
     for (const c of counts) {
-      const hour = new Date(c.timestamp).getHours();
+      const hour = localHour(new Date(c.timestamp), timeZone);
       if (!hourMap.has(hour)) hourMap.set(hour, { entries: [], exits: [] });
       hourMap.get(hour)!.entries.push(c.entries);
       hourMap.get(hour)!.exits.push(c.exits);

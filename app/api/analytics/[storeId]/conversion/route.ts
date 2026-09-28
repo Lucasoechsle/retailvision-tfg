@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { authorizeStore } from "@/lib/auth/api";
 import { canAccessStoreModule } from "@/lib/auth/roles";
-import { addDays, dayRange, daysInclusive, isIsoDate } from "@/lib/dates";
+import { addDays, dayRange, daysInclusive, isIsoDate, storeTimeZone } from "@/lib/dates";
 
 interface DayRow {
   day: string;
@@ -48,7 +48,7 @@ export async function GET(request: NextRequest, { params }: { params: { storeId:
 
   const previousFrom = addDays(from, -length);
   const previousTo = addDays(from, -1);
-  const timeZone = auth.store.timezone || "America/Argentina/Cordoba";
+  const timeZone = storeTimeZone(auth.store);
   const range = dayRange(previousFrom, to, timeZone);
 
   const supabase = createClient();

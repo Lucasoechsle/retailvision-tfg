@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { authorizeStore } from "@/lib/auth/api";
 import { canAccessStoreModule } from "@/lib/auth/roles";
-import { addDays, dayRange, daysInclusive, isIsoDate } from "@/lib/dates";
+import { addDays, dayRange, daysInclusive, isIsoDate, storeTimeZone } from "@/lib/dates";
 
 interface HourRow {
   day: string;
@@ -78,7 +78,7 @@ export async function GET(request: NextRequest, { params }: { params: { storeId:
   const shift = comparisonShift(length);
   const previousFrom = addDays(from, -shift);
   const previousTo = addDays(to, -shift);
-  const timeZone = auth.store.timezone || "America/Argentina/Cordoba";
+  const timeZone = storeTimeZone(auth.store);
 
   const supabase = createClient();
   const query = (a: string, b: string) => {

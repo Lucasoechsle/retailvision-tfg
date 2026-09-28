@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
+import { addDays, localDate } from "@/lib/dates";
 
 export interface Insight {
   id: string;
@@ -14,29 +15,30 @@ export interface Insight {
   generated_at: string;
 }
 
-export async function generateStoreInsights(storeId: string): Promise<Insight[]> {
+export async function generateStoreInsights(storeId: string, timeZone: string): Promise<Insight[]> {
   const supabase = createClient();
   const insights: Insight[] = [];
   const now = new Date();
 
-  const last7days = new Date(now);
-  last7days.setDate(last7days.getDate() - 7);
-  const prev7days = new Date(last7days);
-  prev7days.setDate(prev7days.getDate() - 7);
+  // Últimos 7 días completos de la tienda contra los 7 anteriores (hoy todavía está en curso)
+  const today = localDate(now, timeZone);
+  const currentFrom = addDays(today, -7);
+  const previousFrom = addDays(today, -14);
 
   const { data: currentWeek } = await supabase
     .from("daily_store_summaries")
     .select("*")
     .eq("store_id", storeId)
-    .gte("date", last7days.toISOString().split("T")[0])
+    .gte("date", currentFrom)
+    .lt("date", today)
     .order("date");
 
   const { data: previousWeek } = await supabase
     .from("daily_store_summaries")
     .select("*")
     .eq("store_id", storeId)
-    .gte("date", prev7days.toISOString().split("T")[0])
-    .lt("date", last7days.toISOString().split("T")[0])
+    .gte("date", previousFrom)
+    .lt("date", currentFrom)
     .order("date");
 
   if (currentWeek && previousWeek && currentWeek.length > 0 && previousWeek.length > 0) {
@@ -120,7 +122,8 @@ export async function generateStoreInsights(storeId: string): Promise<Insight[]>
     .from("daily_zone_summaries")
     .select("*, zones(name, zone_type)")
     .eq("store_id", storeId)
-    .gte("date", last7days.toISOString().split("T")[0])
+    .gte("date", currentFrom)
+    .lt("date", today)
     .order("total_visits", { ascending: false });
 
   if (zoneSummaries && zoneSummaries.length > 0) {

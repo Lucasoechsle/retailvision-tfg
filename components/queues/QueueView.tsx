@@ -19,6 +19,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from "recharts";
+import { storeTimeZone } from "@/lib/dates";
 import type { Store } from "@/types";
 
 interface CurrentQueue {
@@ -71,9 +72,11 @@ export function QueueView({ store, data }: QueueViewProps) {
   const uniqueZones = Array.from(new Set(history.map((h) => h.zone_name)));
   const hourGroups: Record<string, Record<string, number>> = {};
   history.forEach((h) => {
-    const hourLabel = new Date(h.hour).toLocaleTimeString("es", {
+    const hourLabel = new Date(h.hour).toLocaleTimeString("es-AR", {
+      timeZone: storeTimeZone(store),
       hour: "2-digit",
       minute: "2-digit",
+      hourCycle: "h23",
     });
     if (!hourGroups[hourLabel]) hourGroups[hourLabel] = {};
     hourGroups[hourLabel][h.zone_name] = h.avg_people;

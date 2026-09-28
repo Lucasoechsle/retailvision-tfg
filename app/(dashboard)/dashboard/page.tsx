@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getAccessibleStores, getSession } from "@/lib/auth/session";
 import { DashboardOverview } from "@/components/dashboard/DashboardOverview";
 import { createClient } from "@/lib/supabase/server";
+import { localDate, localMidnight, storeTimeZone } from "@/lib/dates";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Overview" };
@@ -25,15 +26,17 @@ export default async function DashboardPage() {
   let activeCampaigns = 0;
 
   if (storeIds.length > 0) {
-    const today = new Date().toISOString().split("T")[0];
+    // "Hoy" de cada sucursal, en su zona horaria
+    const todayByStore = new Map(stores.map((s) => [s.id, localDate(new Date(), storeTimeZone(s))]));
+    const todays = Array.from(new Set(todayByStore.values()));
 
     const [devicesRes, summariesRes, alertsRes, campaignsRes, latestCounts] = await Promise.all([
       supabase.from("devices").select("status").in("store_id", storeIds).eq("is_active", true),
       supabase
         .from("daily_store_summaries")
-        .select("total_visitors, total_transactions, conversion_rate")
+        .select("store_id, date, total_visitors, total_transactions, conversion_rate")
         .in("store_id", storeIds)
-        .eq("date", today),
+        .in("date", todays),
       supabase
         .from("alert_events")
         .select("id", { count: "exact", head: true })
@@ -64,7 +67,7 @@ export default async function DashboardPage() {
     activeCampaigns = campaignsRes.count || 0;
     currentInside = latestCounts.reduce((s, r) => s + (r.data?.current_inside || 0), 0);
 
-    const summaries = summariesRes.data || [];
+    const summaries = (summariesRes.data || []).filter((s) => todayByStore.get(s.store_id) === s.date);
     if (summaries.length > 0) {
       totalVisitorsToday = summaries.reduce((s, d) => s + (d.total_visitors || 0), 0);
       const totalTx = summaries.reduce((s, d) => s + (d.total_transactions || 0), 0);
@@ -74,16 +77,19 @@ export default async function DashboardPage() {
     }
 
     if (totalVisitorsToday === 0) {
-      const startOfDay = `${today}T00:00:00.000Z`;
-      const { data: counts } = await supabase
-        .from("people_counts")
-        .select("entries")
-        .in("store_id", storeIds)
-        .gte("timestamp", startOfDay);
-
-      if (counts && counts.length > 0) {
-        totalVisitorsToday = counts.reduce((s, c) => s + (c.entries || 0), 0);
-      }
+      const counts = await Promise.all(
+        stores.map((s) =>
+          supabase
+            .from("people_counts")
+            .select("entries")
+            .eq("store_id", s.id)
+            .gte("timestamp", localMidnight(todayByStore.get(s.id)!, storeTimeZone(s)).toISOString())
+        )
+      );
+      totalVisitorsToday = counts.reduce(
+        (sum, res) => sum + (res.data || []).reduce((s, c) => s + (c.entries || 0), 0),
+        0
+      );
     }
   }
 

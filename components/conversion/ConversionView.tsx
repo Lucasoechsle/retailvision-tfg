@@ -27,6 +27,7 @@ import {
 import { ShoppingCart, Plus, Upload, Download } from "lucide-react";
 import { ConversionPerformance } from "./ConversionPerformance";
 import { toast } from "sonner";
+import { storeTimeZone } from "@/lib/dates";
 import type { Store, Transaction } from "@/types";
 
 interface ImportResult {
@@ -275,7 +276,7 @@ export function ConversionView({ store, transactions, initialRange }: Conversion
                   <TableRow key={tx.id}>
                     <TableCell className="tabular-nums">
                       {new Date(tx.timestamp).toLocaleString("es-AR", {
-                        timeZone: store.timezone || "America/Argentina/Cordoba",
+                        timeZone: storeTimeZone(store),
                         day: "2-digit",
                         month: "2-digit",
                         year: "numeric",

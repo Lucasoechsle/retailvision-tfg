@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
 import { authorizeStore } from "@/lib/auth/api";
+import { localDate, storeTimeZone } from "@/lib/dates";
 
 const createCampaignSchema = z.object({
   store_id: z.string().uuid(),
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest) {
 
   const supabase = createClient();
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = localDate(new Date(), storeTimeZone(auth.store));
   let status = "planned";
   if (parsed.data.start_date <= today && parsed.data.end_date >= today) status = "active";
   else if (parsed.data.end_date < today) status = "completed";

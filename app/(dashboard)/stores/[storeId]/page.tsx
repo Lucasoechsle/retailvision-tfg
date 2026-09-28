@@ -4,6 +4,7 @@ import { getDevicesByStore } from "@/lib/data/devices";
 import { getZonesByStore } from "@/lib/data/zones";
 import { getHourlyTraffic, getRecentCounts } from "@/lib/data/analytics";
 import { createClient } from "@/lib/supabase/server";
+import { storeTimeZone } from "@/lib/dates";
 import { StoreDetail } from "@/components/stores/StoreDetail";
 import type { Metadata } from "next";
 
@@ -30,7 +31,7 @@ export default async function StoreDetailPage({
   const [devices, zones, hourlyTraffic, recentCounts, dwellRes] = await Promise.all([
     getDevicesByStore(params.storeId),
     getZonesByStore(params.storeId),
-    getHourlyTraffic(params.storeId, 7),
+    getHourlyTraffic(params.storeId, 7, storeTimeZone(store)),
     getRecentCounts(params.storeId, 1),
     supabase
       .from("daily_zone_summaries")

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { authorizeStore } from "@/lib/auth/api";
 import { parseTransactionsCsv } from "@/lib/transactions/csv";
+import { storeTimeZone } from "@/lib/dates";
 
 const MAX_BYTES = 1024 * 1024;
 const MAX_ROWS = 5000;
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
   const auth = await authorizeStore(parsed.data.store_id, "load_transactions");
   if (auth.error) return auth.error;
 
-  const timeZone = auth.store.timezone || "America/Argentina/Cordoba";
+  const timeZone = storeTimeZone(auth.store);
   const result = parseTransactionsCsv(parsed.data.csv, timeZone);
 
   if (result.missingColumns.length) {

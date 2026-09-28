@@ -121,7 +121,7 @@ function CampaignDetail({ campaignId }: { campaignId: string }) {
   const { campaign, baseline, campaign_metrics, changes, daily_data } = data;
 
   const chartData = (daily_data || []).map((d: any) => ({
-    date: new Date(d.date).toLocaleDateString("es", { day: "2-digit", month: "short" }),
+    date: new Date(`${d.date}T12:00:00`).toLocaleDateString("es", { day: "2-digit", month: "short" }),
     visitantes: d.total_visitors || 0,
     transacciones: d.total_transactions || 0,
     isCampaign: d.date >= campaign.start_date && d.date <= campaign.end_date,

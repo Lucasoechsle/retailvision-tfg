@@ -1,6 +1,7 @@
 import { guardStoreModule } from "@/lib/auth/guards";
 import { JourneyView } from "@/components/journeys/JourneyView";
 import { createClient } from "@/lib/supabase/server";
+import { dayRange, isIsoDate, localDate, storeTimeZone } from "@/lib/dates";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Recorridos" };
@@ -17,17 +18,20 @@ export default async function JourneysPage({
   const { store } = guard;
 
   const supabase = createClient();
-  const today = new Date().toISOString().split("T")[0];
-  const startDate = searchParams.start || today;
-  const endDate = searchParams.end || startDate;
+  // Las fechas del filtro son días de la tienda
+  const timeZone = storeTimeZone(store);
+  const today = localDate(new Date(), timeZone);
+  const startDate = isIsoDate(searchParams.start) ? searchParams.start : today;
+  const endDate = isIsoDate(searchParams.end) && searchParams.end >= startDate ? searchParams.end : startDate;
+  const range = dayRange(startDate, endDate, timeZone);
 
   const [journeysRes, flowRes, zonesRes] = await Promise.all([
     supabase
       .from("customer_journeys")
       .select("*")
       .eq("store_id", params.storeId)
-      .gte("started_at", `${startDate}T00:00:00.000Z`)
-      .lte("started_at", `${endDate}T23:59:59.999Z`)
+      .gte("started_at", range.from.toISOString())
+      .lt("started_at", range.to.toISOString())
       .order("started_at", { ascending: false })
       .limit(500),
 

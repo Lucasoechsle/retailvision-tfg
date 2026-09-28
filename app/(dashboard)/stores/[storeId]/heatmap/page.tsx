@@ -2,7 +2,7 @@ import { guardStoreModule } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { HeatmapView } from "@/components/heatmap/HeatmapView";
 import { isHeatmapSlot, slotWindow, sumGrids } from "@/lib/heatmap";
-import { isIsoDate, localDate } from "@/lib/dates";
+import { isIsoDate, localDate, storeTimeZone } from "@/lib/dates";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Mapa de Calor" };
@@ -19,7 +19,7 @@ export default async function HeatmapPage({
   const { store } = guard;
 
   const supabase = createClient();
-  const timeZone = store.timezone || "America/Argentina/Cordoba";
+  const timeZone = storeTimeZone(store);
 
   // HU-14: el gerente elige fecha y franja horaria; por defecto, el último día con datos
   let date = isIsoDate(searchParams.date) ? searchParams.date : null;

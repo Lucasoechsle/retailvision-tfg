@@ -3,7 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { authorize } from "@/lib/auth/api";
 import { canAccessSection } from "@/lib/auth/roles";
 import { canAccessStore, getAccessibleStores } from "@/lib/auth/session";
-import { dayRange, isIsoDate } from "@/lib/dates";
+import { dayRange, isIsoDate, localDate, storeTimeZone } from "@/lib/dates";
 import {
   ALERT_STATUS_LABELS,
   ALERT_TYPE_LABELS,
@@ -44,12 +44,12 @@ export async function GET(request: NextRequest) {
   if (selected.length === 0) return NextResponse.json({ events: [], counts: {} });
 
   const storeIds = selected.map((s) => s.id);
-  const timeZone = selected[0].timezone || "America/Argentina/Cordoba";
+  const timeZone = storeTimeZone(selected[0]);
   const range =
     isIsoDate(fromDate) || isIsoDate(toDate)
       ? dayRange(
           isIsoDate(fromDate) ? fromDate : "2000-01-01",
-          isIsoDate(toDate) ? toDate : new Date().toISOString().slice(0, 10),
+          isIsoDate(toDate) ? toDate : localDate(new Date(), timeZone),
           timeZone
         )
       : null;
@@ -160,7 +160,7 @@ function csvResponse(events: AlertRow[], timeZone: string, storeLabel: string) {
   const csv = [header, ...rows].map((r) => r.map(cell).join(";")).join("\r\n");
 
   const slug = storeLabel.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-");
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDate(new Date(), timeZone);
   return new NextResponse("\uFEFF" + csv, {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",

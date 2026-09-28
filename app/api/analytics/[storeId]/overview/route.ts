@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { authorizeStore } from "@/lib/auth/api";
+import { localDate, storeTimeZone } from "@/lib/dates";
 
 export async function GET(
   _request: NextRequest,
@@ -13,7 +14,7 @@ export async function GET(
   const supabase = createClient();
 
   const storeId = params.storeId;
-  const today = new Date().toISOString().split("T")[0];
+  const today = localDate(new Date(), storeTimeZone(auth.store));
 
   const [storeRes, devicesRes, countsRes, summaryRes] = await Promise.all([
     supabase.from("stores").select("*").eq("id", storeId).single(),
@@ -46,7 +47,7 @@ export async function GET(
     current_inside: latestCount?.current_inside || 0,
     avg_dwell_seconds: summary?.avg_dwell_seconds || null,
     conversion_rate: summary?.conversion_rate || null,
-    peak_hour: summary?.peak_hour || null,
+    peak_hour: summary?.peak_hour ?? null,
     devices_online: devices.filter((d) => d.status === "online").length,
     devices_total: devices.length,
   });

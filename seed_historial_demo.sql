@@ -19,24 +19,31 @@
 -- Si el historial ya existe, no hace nada. Después, refresh_demo_dates.sql
 -- mueve la demo y el historial juntos, como siempre.
 --
--- Requiere migration_resumenes_diarios.sql (recalcula los resúmenes).
+-- Los días se cuentan en la zona horaria de la tienda. Requiere
+-- migration_zona_horaria.sql (store_timezone y refresh_daily_summaries).
 -- ============================================================
 
 DO $$
 DECLARE
   v_weeks CONSTANT INT := 9;
+  v_store UUID;
+  v_last  TIMESTAMPTZ;  -- última venta de la demo
+  v_tz    TEXT;
   v_end   TIMESTAMPTZ;  -- fin del último día de demo
   v_start TIMESTAMPTZ;  -- inicio del primer día de demo
   v_week  INT;
   v_trend NUMERIC;
 BEGIN
-  SELECT date_trunc('day', MAX("timestamp")) + INTERVAL '1 day' INTO v_end
-    FROM transactions WHERE source = 'pos_api';
+  SELECT store_id, "timestamp" INTO v_store, v_last
+    FROM transactions WHERE source = 'pos_api'
+   ORDER BY "timestamp" DESC LIMIT 1;
 
-  IF v_end IS NULL THEN
+  IF v_last IS NULL THEN
     RAISE NOTICE 'No se encontraron datos de demostración.';
     RETURN;
   END IF;
+  v_tz := public.store_timezone(v_store);
+  v_end := (((v_last AT TIME ZONE v_tz)::DATE) + 1)::TIMESTAMP AT TIME ZONE v_tz;
   v_start := v_end - INTERVAL '7 days';
 
   IF EXISTS (SELECT 1 FROM transactions WHERE source = 'pos_api' AND "timestamp" < v_start) THEN
@@ -78,9 +85,11 @@ BEGIN
   -- Resúmenes diarios: se recalculan con el historial incluido
   DELETE FROM daily_store_summaries;
   DELETE FROM daily_zone_summaries;
-  PERFORM public.refresh_daily_summaries((CURRENT_DATE - v_start::DATE) + v_weeks * 7);
+  PERFORM public.refresh_daily_summaries(
+    (public.store_today(v_store) - (v_start AT TIME ZONE v_tz)::DATE) + v_weeks * 7
+  );
 
-  RAISE NOTICE 'OK: % semanas de historial generadas antes del %.', v_weeks, v_start::DATE;
+  RAISE NOTICE 'OK: % semanas de historial generadas antes del %.', v_weeks, (v_start AT TIME ZONE v_tz)::DATE;
 END $$;
 
 -- Verificación: entradas y ventas por semana (la última es la semana de demo)

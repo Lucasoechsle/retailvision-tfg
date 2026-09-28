@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { storeTimeZone } from "@/lib/dates";
 import { ALERTS_CHANGED_EVENT } from "@/components/dashboard/AlertBell";
 import {
   ALERT_STATUS_LABELS,
@@ -49,6 +50,7 @@ import {
 interface Store {
   id: string;
   name: string;
+  timezone?: string | null;
 }
 
 interface AlertRule {
@@ -210,12 +212,15 @@ export function AlertsView({ stores, canManageRules, canUpdateAlerts }: AlertsVi
     ],
   };
 
+  // Fecha y hora en la zona horaria de la tienda, en formato de 24 h
   const formatDateTime = (iso: string) =>
     new Date(iso).toLocaleString("es-AR", {
+      timeZone: storeTimeZone(stores.find((s) => s.id === selectedStore)),
       day: "2-digit",
       month: "short",
       hour: "2-digit",
       minute: "2-digit",
+      hourCycle: "h23",
     });
 
   return (

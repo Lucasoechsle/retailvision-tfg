@@ -120,7 +120,7 @@ export function BenchmarkView() {
 
   const trendData = sortedDates.map((date) => {
     const point: Record<string, any> = {
-      date: new Date(date).toLocaleDateString("es", { day: "2-digit", month: "short" }),
+      date: new Date(`${date}T12:00:00`).toLocaleDateString("es", { day: "2-digit", month: "short" }),
     };
     benchmark.forEach((b) => {
       const dayData = b.daily_trend.find((d) => d.date === date);

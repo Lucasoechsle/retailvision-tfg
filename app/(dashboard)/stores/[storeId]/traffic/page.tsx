@@ -1,6 +1,6 @@
 import { guardStoreModule } from "@/lib/auth/guards";
 import { getRecentCounts } from "@/lib/data/analytics";
-import { localDate } from "@/lib/dates";
+import { localDate, storeTimeZone } from "@/lib/dates";
 import { TrafficView } from "@/components/traffic/TrafficView";
 import type { Metadata } from "next";
 
@@ -16,7 +16,7 @@ export default async function TrafficPage({
   const { store } = guard;
 
   // "Hoy" es la fecha de la tienda, no la del servidor
-  const today = localDate(new Date(), store.timezone || "America/Argentina/Cordoba");
+  const today = localDate(new Date(), storeTimeZone(store));
   const [latest] = await getRecentCounts(params.storeId, 1);
 
   return <TrafficView store={store} today={today} latest={latest ?? null} />;

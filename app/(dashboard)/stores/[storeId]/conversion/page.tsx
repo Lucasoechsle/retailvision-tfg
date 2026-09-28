@@ -1,7 +1,7 @@
 import { guardStoreModule } from "@/lib/auth/guards";
 import { createClient } from "@/lib/supabase/server";
 import { ConversionView } from "@/components/conversion/ConversionView";
-import { addDays, localDate } from "@/lib/dates";
+import { addDays, localDate, storeTimeZone } from "@/lib/dates";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = { title: "Conversión" };
@@ -24,7 +24,7 @@ export default async function ConversionPage({
     .limit(50);
 
   // Período inicial: los 30 días que terminan en la última transacción registrada
-  const timeZone = store.timezone || "America/Argentina/Cordoba";
+  const timeZone = storeTimeZone(store);
   const latest = transactions?.[0] ? new Date(transactions[0].timestamp) : new Date();
   const to = localDate(latest, timeZone);
 

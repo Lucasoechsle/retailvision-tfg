@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { authorizeStore } from "@/lib/auth/api";
+import { dayRange, isIsoDate, localDate, storeTimeZone } from "@/lib/dates";
 
 export async function GET(
   request: NextRequest,
@@ -14,16 +15,21 @@ export async function GET(
 
   const storeId = params.storeId;
   const url = new URL(request.url);
-  const startDate = url.searchParams.get("start") || new Date().toISOString().split("T")[0];
-  const endDate = url.searchParams.get("end") || startDate;
+  // Las fechas del filtro son días de la tienda
+  const timeZone = storeTimeZone(auth.store);
+  const start = url.searchParams.get("start");
+  const end = url.searchParams.get("end");
+  const startDate = isIsoDate(start) ? start : localDate(new Date(), timeZone);
+  const endDate = isIsoDate(end) && end >= startDate ? end : startDate;
+  const range = dayRange(startDate, endDate, timeZone);
 
   const [journeysRes, flowRes, zonesRes] = await Promise.all([
     supabase
       .from("customer_journeys")
       .select("*")
       .eq("store_id", storeId)
-      .gte("started_at", `${startDate}T00:00:00.000Z`)
-      .lte("started_at", `${endDate}T23:59:59.999Z`)
+      .gte("started_at", range.from.toISOString())
+      .lt("started_at", range.to.toISOString())
       .order("started_at", { ascending: false })
       .limit(500),
 

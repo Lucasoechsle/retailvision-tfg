@@ -1,5 +1,12 @@
 /** Fechas en la zona horaria de la tienda (las tiendas guardan su zona en stores.timezone). */
 
+export const DEFAULT_TIMEZONE = "America/Argentina/Cordoba";
+
+/** Zona horaria de una tienda (la de Córdoba si no tiene una cargada). */
+export function storeTimeZone(store: { timezone?: string | null } | null | undefined): string {
+  return store?.timezone || DEFAULT_TIMEZONE;
+}
+
 export function isIsoDate(value: unknown): value is string {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) && !isNaN(Date.parse(value));
 }
@@ -12,6 +19,18 @@ export function localDate(instant: Date, timeZone: string): string {
     month: "2-digit",
     day: "2-digit",
   }).format(instant);
+}
+
+/** Hora del día (0 a 23) de un instante en la zona horaria de la tienda. */
+export function localHour(instant: Date, timeZone: string): number {
+  return Number(
+    new Intl.DateTimeFormat("en-GB", { timeZone, hour: "2-digit", hourCycle: "h23" }).format(instant)
+  );
+}
+
+/** Día de la semana (0 = domingo) de una fecha AAAA-MM-DD. */
+export function weekday(date: string): number {
+  return new Date(`${date}T12:00:00Z`).getUTCDay();
 }
 
 /** Desplazamiento UTC de la zona horaria en esa fecha, por ejemplo "-03:00". */

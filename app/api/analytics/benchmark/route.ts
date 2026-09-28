@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { authorize } from "@/lib/auth/api";
 import { canAccessSection } from "@/lib/auth/roles";
+import { addDays, localDate, storeTimeZone } from "@/lib/dates";
 
 export async function GET(request: NextRequest) {
   const auth = await authorize();
@@ -14,13 +15,10 @@ export async function GET(request: NextRequest) {
   const profile = { organization_id: auth.session.organizationId };
 
   const days = parseInt(request.nextUrl.searchParams.get("days") || "30", 10);
-  const since = new Date();
-  since.setDate(since.getDate() - days);
-  const sinceStr = since.toISOString().split("T")[0];
 
   const { data: stores } = await supabase
     .from("stores")
-    .select("id, name, address, is_active")
+    .select("id, name, address, is_active, timezone")
     .eq("organization_id", profile.organization_id)
     .eq("is_active", true)
     .order("name");
@@ -30,6 +28,8 @@ export async function GET(request: NextRequest) {
   }
 
   const storeIds = stores.map((s) => s.id);
+  // Fechas de la organización, en la zona horaria de sus tiendas
+  const sinceStr = addDays(localDate(new Date(), storeTimeZone(stores[0])), -days);
 
   const { data: summaries } = await supabase
     .from("daily_store_summaries")
